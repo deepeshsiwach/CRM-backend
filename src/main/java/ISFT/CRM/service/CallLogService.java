@@ -569,6 +569,19 @@ public class CallLogService {
         existingCallLog.setRemarks(
                 callLogDetails.getRemarks());
 
+        // ========================================
+        // NEW CALL DETAILS
+        // ========================================
+
+        existingCallLog.setEducation(
+                callLogDetails.getEducation());
+
+        existingCallLog.setInterestedArea(
+                callLogDetails.getInterestedArea());
+
+        existingCallLog.setCity(
+                callLogDetails.getCity());
+
 
         CallLog savedCallLog =
                 callLogRepository.save(
@@ -576,7 +589,7 @@ public class CallLogService {
 
 
         // ========================================
-        // SYNC EDUCATION + INTERESTED AREA TO LEAD
+        // SYNC CALL DETAILS TO LEAD
         // ========================================
 
         syncLeadDetailsFromCall(
@@ -708,7 +721,7 @@ public class CallLogService {
 
 
         // ========================================
-        // SYNC EDUCATION + INTERESTED AREA TO LEAD
+        // SYNC CALL DETAILS TO LEAD
         // ========================================
 
         syncLeadDetailsFromCall(
@@ -892,35 +905,74 @@ public class CallLogService {
                 existingCallLog);
     }
 
+
     // ========================================
     // SYNC CALL DETAILS TO LEAD
     // ========================================
 
-    private void syncLeadDetailsFromCall(CallLog callLog) {
+    private void syncLeadDetailsFromCall(
+            CallLog callLog) {
 
-        Lead lead = leadRepository.findById(callLog.getLeadId())
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Lead not found"));
+        Lead lead =
+                leadRepository.findById(
+                                callLog.getLeadId())
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Lead not found"));
 
-        // Update Education only when provided
+
+        // ========================================
+        // UPDATE EDUCATION ONLY WHEN PROVIDED
+        // ========================================
+
         if (callLog.getEducation() != null &&
-                !callLog.getEducation().trim().isEmpty()) {
+                !callLog.getEducation()
+                        .trim()
+                        .isEmpty()) {
 
             lead.setEducation(
-                    callLog.getEducation().trim()
+                    callLog.getEducation()
+                            .trim()
             );
         }
 
-        // Update Interested Area only when provided
+
+        // ========================================
+        // UPDATE INTERESTED AREA ONLY WHEN PROVIDED
+        // ========================================
+
         if (callLog.getInterestedArea() != null &&
-                !callLog.getInterestedArea().trim().isEmpty()) {
+                !callLog.getInterestedArea()
+                        .trim()
+                        .isEmpty()) {
 
             lead.setInterestedArea(
-                    callLog.getInterestedArea().trim()
+                    callLog.getInterestedArea()
+                            .trim()
             );
         }
+
+
+        // ========================================
+        // UPDATE CITY ONLY WHEN PROVIDED
+        // ========================================
+
+        if (callLog.getCity() != null &&
+                !callLog.getCity()
+                        .trim()
+                        .isEmpty()) {
+
+            lead.setCity(
+                    callLog.getCity()
+                            .trim()
+            );
+        }
+
+
+        // ========================================
+        // SAVE LEAD
+        // ========================================
 
         leadRepository.save(lead);
     }
 }
-

@@ -43,6 +43,9 @@ public class CallLog {
     @Column(name = "interested_area", length = 255)
     private String interestedArea;
 
+    @Column(length = 150)
+    private String city;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -159,6 +162,15 @@ public class CallLog {
 
     public void setInterestedArea(String interestedArea) {
         this.interestedArea = interestedArea;
+    }
+
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
     }
 
 

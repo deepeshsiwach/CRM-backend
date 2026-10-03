@@ -3,7 +3,6 @@ package ISFT.CRM.service;
 import ISFT.CRM.entity.FollowUp;
 import ISFT.CRM.repository.FollowUpRepository;
 
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,8 +17,7 @@ public class FollowUpScheduler {
     public FollowUpScheduler(
             FollowUpRepository followUpRepository) {
 
-        this.followUpRepository =
-                followUpRepository;
+        this.followUpRepository = followUpRepository;
     }
 
 
@@ -27,14 +25,19 @@ public class FollowUpScheduler {
     // AUTOMATICALLY MARK OVERDUE FOLLOW-UPS AS MISSED
     // ============================================================
     //
-    // Runs every 1 minute.
+    // IMPORTANT:
+    // Automatic scheduling has been removed from this class.
     //
-    // PENDING + followUpDate before current time
-    //                ↓
-    //              MISSED
+    // FollowUpReminderScheduler is now responsible for:
+    //
+    // 1. Upcoming follow-up notifications
+    // 2. Overdue follow-up notifications
+    // 3. Marking overdue follow-ups as MISSED
+    //
+    // This method is kept for compatibility and can still be
+    // called manually if needed.
     //
     // ============================================================
-
 
     @Transactional
     public void markOverdueFollowUpsAsMissed() {
@@ -62,7 +65,6 @@ public class FollowUpScheduler {
             followUp.setStatus(
                     FollowUp.FollowUpStatus.MISSED
             );
-
         }
 
 
@@ -70,8 +72,9 @@ public class FollowUpScheduler {
                 overdueFollowUps
         );
 
+
         System.out.println(
-                "Automatic follow-up scheduler: "
+                "Manual follow-up scheduler: "
                         + overdueFollowUps.size()
                         + " overdue follow-up(s) marked as MISSED."
         );

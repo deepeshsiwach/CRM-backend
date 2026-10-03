@@ -576,11 +576,21 @@ public class CallLogService {
 
 
         // ========================================
+        // SYNC EDUCATION + INTERESTED AREA TO LEAD
+        // ========================================
+
+        syncLeadDetailsFromCall(
+                savedCallLog
+        );
+
+
+        // ========================================
         // AUTOMATIC LEAD STATUS UPDATE
         // ========================================
 
         updateLeadStatusFromCallOutcome(
-                savedCallLog);
+                savedCallLog
+        );
 
 
         return savedCallLog;
@@ -698,11 +708,21 @@ public class CallLogService {
 
 
         // ========================================
+        // SYNC EDUCATION + INTERESTED AREA TO LEAD
+        // ========================================
+
+        syncLeadDetailsFromCall(
+                savedCallLog
+        );
+
+
+        // ========================================
         // AUTOMATIC LEAD STATUS UPDATE
         // ========================================
 
         updateLeadStatusFromCallOutcome(
-                savedCallLog);
+                savedCallLog
+        );
 
 
         return savedCallLog;
@@ -871,4 +891,36 @@ public class CallLogService {
         callLogRepository.delete(
                 existingCallLog);
     }
+
+    // ========================================
+    // SYNC CALL DETAILS TO LEAD
+    // ========================================
+
+    private void syncLeadDetailsFromCall(CallLog callLog) {
+
+        Lead lead = leadRepository.findById(callLog.getLeadId())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Lead not found"));
+
+        // Update Education only when provided
+        if (callLog.getEducation() != null &&
+                !callLog.getEducation().trim().isEmpty()) {
+
+            lead.setEducation(
+                    callLog.getEducation().trim()
+            );
+        }
+
+        // Update Interested Area only when provided
+        if (callLog.getInterestedArea() != null &&
+                !callLog.getInterestedArea().trim().isEmpty()) {
+
+            lead.setInterestedArea(
+                    callLog.getInterestedArea().trim()
+            );
+        }
+
+        leadRepository.save(lead);
+    }
 }
+

@@ -38,6 +38,12 @@ public class Lead {
     @Column(length = 100)
     private String city;
 
+    @Column(length = 150)
+    private String education;
+
+    @Column(name = "interested_area", length = 255)
+    private String interestedArea;
+
     @Column(name = "campaign_id")
     private Long campaignId;
 
@@ -138,6 +144,22 @@ public class Lead {
 
     public void setCity(String city) {
         this.city = city;
+    }
+
+    public String getEducation() {
+        return education;
+    }
+
+    public void setEducation(String education) {
+        this.education = education;
+    }
+
+    public String getInterestedArea() {
+        return interestedArea;
+    }
+
+    public void setInterestedArea(String interestedArea) {
+        this.interestedArea = interestedArea;
     }
 
     public Long getCampaignId() {

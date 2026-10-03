@@ -1,7 +1,7 @@
 package ISFT.CRM.entity;
 
 import jakarta.persistence.*;
-        import java.time.LocalDateTime;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "call_logs")
@@ -37,8 +37,15 @@ public class CallLog {
     @Column(columnDefinition = "TEXT")
     private String remarks;
 
+    @Column(length = 150)
+    private String education;
+
+    @Column(name = "interested_area", length = 255)
+    private String interestedArea;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
+
 
     public enum CallStatus {
         ANSWERED,
@@ -46,6 +53,7 @@ public class CallLog {
         BUSY,
         FAILED
     }
+
 
     public enum CallOutcome {
         INTERESTED,
@@ -58,9 +66,11 @@ public class CallLog {
         NO_RESPONSE
     }
 
+
     public Long getId() {
         return id;
     }
+
 
     public Long getLeadId() {
         return leadId;
@@ -70,6 +80,7 @@ public class CallLog {
         this.leadId = leadId;
     }
 
+
     public Long getAgentId() {
         return agentId;
     }
@@ -77,6 +88,7 @@ public class CallLog {
     public void setAgentId(Long agentId) {
         this.agentId = agentId;
     }
+
 
     public LocalDateTime getCallStartTime() {
         return callStartTime;
@@ -86,6 +98,7 @@ public class CallLog {
         this.callStartTime = callStartTime;
     }
 
+
     public LocalDateTime getCallEndTime() {
         return callEndTime;
     }
@@ -93,6 +106,7 @@ public class CallLog {
     public void setCallEndTime(LocalDateTime callEndTime) {
         this.callEndTime = callEndTime;
     }
+
 
     public Integer getDurationSeconds() {
         return durationSeconds;
@@ -102,6 +116,7 @@ public class CallLog {
         this.durationSeconds = durationSeconds;
     }
 
+
     public CallStatus getCallStatus() {
         return callStatus;
     }
@@ -109,6 +124,7 @@ public class CallLog {
     public void setCallStatus(CallStatus callStatus) {
         this.callStatus = callStatus;
     }
+
 
     public CallOutcome getCallOutcome() {
         return callOutcome;
@@ -118,6 +134,7 @@ public class CallLog {
         this.callOutcome = callOutcome;
     }
 
+
     public String getRemarks() {
         return remarks;
     }
@@ -125,6 +142,25 @@ public class CallLog {
     public void setRemarks(String remarks) {
         this.remarks = remarks;
     }
+
+
+    public String getEducation() {
+        return education;
+    }
+
+    public void setEducation(String education) {
+        this.education = education;
+    }
+
+
+    public String getInterestedArea() {
+        return interestedArea;
+    }
+
+    public void setInterestedArea(String interestedArea) {
+        this.interestedArea = interestedArea;
+    }
+
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

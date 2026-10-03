@@ -35,7 +35,7 @@ public class FollowUpScheduler {
     //
     // ============================================================
 
-    @Scheduled(fixedRate = 60000)
+
     @Transactional
     public void markOverdueFollowUpsAsMissed() {
 

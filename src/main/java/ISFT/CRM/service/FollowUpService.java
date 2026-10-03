@@ -30,19 +30,23 @@ public class FollowUpService {
     private final UserRepository userRepository;
     private final LeadAssignmentRepository leadAssignmentRepository;
     private final LeadService leadService;
+    private final NotificationService notificationService;
+
 
     public FollowUpService(
             FollowUpRepository followUpRepository,
             LeadRepository leadRepository,
             UserRepository userRepository,
             LeadAssignmentRepository leadAssignmentRepository,
-            LeadService leadService) {
+            LeadService leadService,
+            NotificationService notificationService) {
 
         this.followUpRepository = followUpRepository;
         this.leadRepository = leadRepository;
         this.userRepository = userRepository;
         this.leadAssignmentRepository = leadAssignmentRepository;
         this.leadService = leadService;
+        this.notificationService = notificationService;
     }
 
 
@@ -65,6 +69,7 @@ public class FollowUpService {
             return List.of();
         }
 
+
         boolean isAgent =
                 authentication.getAuthorities()
                         .stream()
@@ -72,16 +77,21 @@ public class FollowUpService {
                                 authority.getAuthority()
                                         .equals("ROLE_AGENT"));
 
+
         // ADMIN / MANAGER
         if (!isAgent) {
+
             return followUpRepository.findAll();
         }
+
 
         Long agentId =
                 getAuthenticatedAgentId();
 
+
         Set<Long> activeLeadIds =
                 getActiveLeadIdsForAgent(agentId);
+
 
         return followUpRepository
                 .findByAgentId(agentId)
@@ -110,6 +120,7 @@ public class FollowUpService {
             return List.of();
         }
 
+
         boolean isAgent =
                 authentication.getAuthorities()
                         .stream()
@@ -117,14 +128,18 @@ public class FollowUpService {
                                 authority.getAuthority()
                                         .equals("ROLE_AGENT"));
 
+
         // ADMIN / MANAGER
         // Can view follow-ups for any lead
         if (!isAgent) {
+
             return followUpRepository.findByLeadId(leadId);
         }
 
+
         Long agentId =
                 getAuthenticatedAgentId();
+
 
         // AGENT must currently be assigned to the lead
         if (!isLeadAssignedToAgent(
@@ -133,6 +148,7 @@ public class FollowUpService {
 
             return List.of();
         }
+
 
         // Return ALL follow-up history for this lead,
         // regardless of which agent created the follow-up.
@@ -157,6 +173,7 @@ public class FollowUpService {
             return List.of();
         }
 
+
         boolean isAgent =
                 authentication.getAuthorities()
                         .stream()
@@ -164,23 +181,30 @@ public class FollowUpService {
                                 authority.getAuthority()
                                         .equals("ROLE_AGENT"));
 
+
         // ADMIN / MANAGER
         if (!isAgent) {
+
             return followUpRepository
                     .findByAgentId(agentId);
         }
 
+
         Long authenticatedAgentId =
                 getAuthenticatedAgentId();
 
+
         // AGENT can only access own follow-ups
         if (!authenticatedAgentId.equals(agentId)) {
+
             return List.of();
         }
+
 
         Set<Long> activeLeadIds =
                 getActiveLeadIdsForAgent(
                         authenticatedAgentId);
+
 
         return followUpRepository
                 .findByAgentId(authenticatedAgentId)
@@ -209,6 +233,7 @@ public class FollowUpService {
             return List.of();
         }
 
+
         boolean isAgent =
                 authentication.getAuthorities()
                         .stream()
@@ -216,17 +241,22 @@ public class FollowUpService {
                                 authority.getAuthority()
                                         .equals("ROLE_AGENT"));
 
+
         // ADMIN / MANAGER
         if (!isAgent) {
+
             return followUpRepository
                     .findByStatus(status);
         }
 
+
         Long agentId =
                 getAuthenticatedAgentId();
 
+
         Set<Long> activeLeadIds =
                 getActiveLeadIdsForAgent(agentId);
+
 
         return followUpRepository
                 .findByStatus(status)
@@ -260,6 +290,7 @@ public class FollowUpService {
             return List.of();
         }
 
+
         boolean isAgent =
                 authentication.getAuthorities()
                         .stream()
@@ -267,25 +298,32 @@ public class FollowUpService {
                                 authority.getAuthority()
                                         .equals("ROLE_AGENT"));
 
+
         // ADMIN / MANAGER
         if (!isAgent) {
+
             return followUpRepository
                     .findByAgentIdAndStatus(
                             agentId,
                             status);
         }
 
+
         Long authenticatedAgentId =
                 getAuthenticatedAgentId();
 
+
         // AGENT can only query own follow-ups
         if (!authenticatedAgentId.equals(agentId)) {
+
             return List.of();
         }
+
 
         Set<Long> activeLeadIds =
                 getActiveLeadIdsForAgent(
                         authenticatedAgentId);
+
 
         return followUpRepository
                 .findByAgentIdAndStatus(
@@ -316,12 +354,16 @@ public class FollowUpService {
             return Optional.empty();
         }
 
+
         Optional<FollowUp> followUpOptional =
                 followUpRepository.findById(id);
 
+
         if (followUpOptional.isEmpty()) {
+
             return Optional.empty();
         }
+
 
         boolean isAgent =
                 authentication.getAuthorities()
@@ -330,16 +372,21 @@ public class FollowUpService {
                                 authority.getAuthority()
                                         .equals("ROLE_AGENT"));
 
+
         // ADMIN / MANAGER
         if (!isAgent) {
+
             return followUpOptional;
         }
+
 
         Long agentId =
                 getAuthenticatedAgentId();
 
+
         FollowUp followUp =
                 followUpOptional.get();
+
 
         // Must belong to authenticated agent
         if (!Objects.equals(
@@ -349,6 +396,7 @@ public class FollowUpService {
             return Optional.empty();
         }
 
+
         // Lead must still be actively assigned
         if (!isLeadAssignedToAgent(
                 followUp.getLeadId(),
@@ -356,6 +404,7 @@ public class FollowUpService {
 
             return Optional.empty();
         }
+
 
         return followUpOptional;
     }
@@ -370,6 +419,7 @@ public class FollowUpService {
         LocalDateTime now =
                 LocalDateTime.now();
 
+
         Authentication authentication =
                 SecurityContextHolder.getContext()
                         .getAuthentication();
@@ -380,12 +430,14 @@ public class FollowUpService {
             return List.of();
         }
 
+
         boolean isAgent =
                 authentication.getAuthorities()
                         .stream()
                         .anyMatch(authority ->
                                 authority.getAuthority()
                                         .equals("ROLE_AGENT"));
+
 
         // ADMIN / MANAGER
         if (!isAgent) {
@@ -396,11 +448,14 @@ public class FollowUpService {
                             FollowUp.FollowUpStatus.PENDING);
         }
 
+
         Long agentId =
                 getAuthenticatedAgentId();
 
+
         Set<Long> activeLeadIds =
                 getActiveLeadIdsForAgent(agentId);
+
 
         return followUpRepository
                 .findByAgentIdAndFollowUpDateBeforeAndStatus(
@@ -424,12 +479,15 @@ public class FollowUpService {
         LocalDate today =
                 LocalDate.now();
 
+
         LocalDateTime start =
                 today.atStartOfDay();
+
 
         LocalDateTime end =
                 today.plusDays(1)
                         .atStartOfDay();
+
 
         Authentication authentication =
                 SecurityContextHolder.getContext()
@@ -441,12 +499,14 @@ public class FollowUpService {
             return List.of();
         }
 
+
         boolean isAgent =
                 authentication.getAuthorities()
                         .stream()
                         .anyMatch(authority ->
                                 authority.getAuthority()
                                         .equals("ROLE_AGENT"));
+
 
         // ADMIN / MANAGER
         if (!isAgent) {
@@ -458,11 +518,14 @@ public class FollowUpService {
                             FollowUp.FollowUpStatus.PENDING);
         }
 
+
         Long agentId =
                 getAuthenticatedAgentId();
 
+
         Set<Long> activeLeadIds =
                 getActiveLeadIdsForAgent(agentId);
+
 
         return followUpRepository
                 .findByAgentIdAndFollowUpDateBetweenAndStatus(
@@ -487,6 +550,7 @@ public class FollowUpService {
         LocalDateTime start =
                 LocalDateTime.now();
 
+
         Authentication authentication =
                 SecurityContextHolder.getContext()
                         .getAuthentication();
@@ -497,12 +561,14 @@ public class FollowUpService {
             return List.of();
         }
 
+
         boolean isAgent =
                 authentication.getAuthorities()
                         .stream()
                         .anyMatch(authority ->
                                 authority.getAuthority()
                                         .equals("ROLE_AGENT"));
+
 
         // ADMIN / MANAGER
         if (!isAgent) {
@@ -513,11 +579,14 @@ public class FollowUpService {
                             FollowUp.FollowUpStatus.PENDING);
         }
 
+
         Long agentId =
                 getAuthenticatedAgentId();
 
+
         Set<Long> activeLeadIds =
                 getActiveLeadIdsForAgent(agentId);
+
 
         return followUpRepository
                 .findByAgentIdAndFollowUpDateAfterAndStatus(
@@ -542,14 +611,17 @@ public class FollowUpService {
                 SecurityContextHolder.getContext()
                         .getAuthentication();
 
+
         if (authentication == null) {
 
             throw new RuntimeException(
                     "Unauthorized access");
         }
 
+
         String email =
                 authentication.getName();
+
 
         return userRepository
                 .findByEmail(email)
@@ -611,6 +683,7 @@ public class FollowUpService {
                                 new ResourceNotFoundException(
                                         "Follow-up not found"));
 
+
         Authentication authentication =
                 SecurityContextHolder.getContext()
                         .getAuthentication();
@@ -622,12 +695,14 @@ public class FollowUpService {
                     "Unauthorized access");
         }
 
+
         boolean isAgent =
                 authentication.getAuthorities()
                         .stream()
                         .anyMatch(authority ->
                                 authority.getAuthority()
                                         .equals("ROLE_AGENT"));
+
 
         // ========================================
         // AGENT SECURITY
@@ -638,6 +713,7 @@ public class FollowUpService {
             Long agentId =
                     getAuthenticatedAgentId();
 
+
             // Existing follow-up must belong to agent
             if (!Objects.equals(
                     existingFollowUp.getAgentId(),
@@ -646,6 +722,7 @@ public class FollowUpService {
                 throw new RuntimeException(
                         "You are not allowed to update this follow-up");
             }
+
 
             // Existing lead must still be assigned
             if (!isLeadAssignedToAgent(
@@ -656,6 +733,7 @@ public class FollowUpService {
                         "You are not allowed to update this follow-up because the lead is not actively assigned to you");
             }
 
+
             // New lead must be assigned to same agent
             if (!isLeadAssignedToAgent(
                     followUpDetails.getLeadId(),
@@ -664,6 +742,7 @@ public class FollowUpService {
                 throw new RuntimeException(
                         "You are not allowed to move this follow-up to this lead");
             }
+
 
             // Agent cannot change ownership
             followUpDetails.setAgentId(agentId);
@@ -722,6 +801,7 @@ public class FollowUpService {
                                 new ResourceNotFoundException(
                                         "Follow-up not found"));
 
+
         Authentication authentication =
                 SecurityContextHolder.getContext()
                         .getAuthentication();
@@ -733,12 +813,14 @@ public class FollowUpService {
                     "Unauthorized access");
         }
 
+
         boolean isAgent =
                 authentication.getAuthorities()
                         .stream()
                         .anyMatch(authority ->
                                 authority.getAuthority()
                                         .equals("ROLE_AGENT"));
+
 
         // ========================================
         // AGENT SECURITY
@@ -749,6 +831,7 @@ public class FollowUpService {
             Long agentId =
                     getAuthenticatedAgentId();
 
+
             if (!Objects.equals(
                     existingFollowUp.getAgentId(),
                     agentId)) {
@@ -756,6 +839,7 @@ public class FollowUpService {
                 throw new RuntimeException(
                         "You are not allowed to delete this follow-up");
             }
+
 
             if (!isLeadAssignedToAgent(
                     existingFollowUp.getLeadId(),
@@ -786,11 +870,13 @@ public class FollowUpService {
                     "Follow-up status is required");
         }
 
+
         FollowUp followUp =
                 followUpRepository.findById(id)
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
                                         "Follow-up not found"));
+
 
         Authentication authentication =
                 SecurityContextHolder.getContext()
@@ -803,12 +889,14 @@ public class FollowUpService {
                     "Unauthorized access");
         }
 
+
         boolean isAgent =
                 authentication.getAuthorities()
                         .stream()
                         .anyMatch(authority ->
                                 authority.getAuthority()
                                         .equals("ROLE_AGENT"));
+
 
         // ========================================
         // AGENT SECURITY
@@ -819,6 +907,7 @@ public class FollowUpService {
             Long agentId =
                     getAuthenticatedAgentId();
 
+
             if (!Objects.equals(
                     followUp.getAgentId(),
                     agentId)) {
@@ -826,6 +915,7 @@ public class FollowUpService {
                 throw new RuntimeException(
                         "You are not allowed to update this follow-up");
             }
+
 
             if (!isLeadAssignedToAgent(
                     followUp.getLeadId(),
@@ -862,6 +952,7 @@ public class FollowUpService {
                     "Unauthorized access");
         }
 
+
         boolean isAgent =
                 authentication.getAuthorities()
                         .stream()
@@ -891,6 +982,7 @@ public class FollowUpService {
             Long agentId =
                     getAuthenticatedAgentId();
 
+
             // Lead must be actively assigned
             if (!isLeadAssignedToAgent(
                     followUp.getLeadId(),
@@ -899,6 +991,7 @@ public class FollowUpService {
                 throw new RuntimeException(
                         "You are not allowed to create a follow-up for this lead");
             }
+
 
             // Always use authenticated agent
             followUp.setAgentId(agentId);
@@ -939,6 +1032,37 @@ public class FollowUpService {
 
         FollowUp savedFollowUp =
                 followUpRepository.save(followUp);
+
+
+        // ========================================
+        // CREATE FOLLOW-UP NOTIFICATION
+        // ========================================
+
+        if (savedFollowUp.getStatus() ==
+                FollowUp.FollowUpStatus.PENDING) {
+
+            notificationService.createNotification(
+
+                    savedFollowUp.getAgentId(),
+
+                    "FOLLOW_UP_CREATED",
+
+                    "New Follow-up Assigned",
+
+                    "Follow-up #"
+                            + savedFollowUp.getId()
+                            + " has been scheduled for "
+                            + savedFollowUp.getFollowUpDate()
+                            + ". Purpose: "
+                            + (
+                            savedFollowUp.getPurpose() == null
+                                    ? "Follow-up"
+                                    : savedFollowUp.getPurpose()
+                    ),
+
+                    savedFollowUp.getId()
+            );
+        }
 
 
         // ========================================

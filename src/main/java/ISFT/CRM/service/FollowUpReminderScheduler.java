@@ -7,6 +7,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
@@ -15,16 +16,16 @@ public class FollowUpReminderScheduler {
     private final FollowUpRepository followUpRepository;
     private final NotificationService notificationService;
 
+    // India timezone
+    private static final ZoneId INDIA_ZONE =
+            ZoneId.of("Asia/Kolkata");
 
     public FollowUpReminderScheduler(
             FollowUpRepository followUpRepository,
             NotificationService notificationService) {
 
-        this.followUpRepository =
-                followUpRepository;
-
-        this.notificationService =
-                notificationService;
+        this.followUpRepository = followUpRepository;
+        this.notificationService = notificationService;
     }
 
 
@@ -35,8 +36,16 @@ public class FollowUpReminderScheduler {
     @Scheduled(fixedRate = 60000)
     public void processFollowUpReminders() {
 
+        // IMPORTANT:
+        // Always use India time for CRM follow-ups
         LocalDateTime now =
-                LocalDateTime.now();
+                LocalDateTime.now(INDIA_ZONE);
+
+
+        System.out.println(
+                "Follow-up reminder scheduler running at India time: "
+                        + now
+        );
 
 
         // ========================================
@@ -67,14 +76,16 @@ public class FollowUpReminderScheduler {
 
                     "Upcoming Follow-up",
 
-                    "Follow-up #" +
-                            followUp.getId() +
-                            " is scheduled for " +
-                            followUp.getFollowUpDate() +
-                            ". Purpose: " +
-                            (followUp.getPurpose() == null
+                    "Follow-up #"
+                            + followUp.getId()
+                            + " is scheduled for "
+                            + followUp.getFollowUpDate()
+                            + ". Purpose: "
+                            + (
+                            followUp.getPurpose() == null
                                     ? "Follow-up"
-                                    : followUp.getPurpose()),
+                                    : followUp.getPurpose()
+                    ),
 
                     followUp.getId()
             );
@@ -109,9 +120,9 @@ public class FollowUpReminderScheduler {
 
                     "Overdue Follow-up",
 
-                    "Follow-up #" +
-                            followUp.getId() +
-                            " is overdue. Please complete it.",
+                    "Follow-up #"
+                            + followUp.getId()
+                            + " is overdue. Please complete it.",
 
                     followUp.getId()
             );

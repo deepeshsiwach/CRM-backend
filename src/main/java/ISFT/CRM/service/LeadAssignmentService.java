@@ -26,17 +26,21 @@ public class LeadAssignmentService {
     private final LeadRepository leadRepository;
     private final UserRepository userRepository;
     private final TeamRepository teamRepository;
+    private final NotificationService notificationService;
+
 
     public LeadAssignmentService(
             LeadAssignmentRepository leadAssignmentRepository,
             LeadRepository leadRepository,
             UserRepository userRepository,
-            TeamRepository teamRepository) {
+            TeamRepository teamRepository,
+            NotificationService notificationService) {
 
         this.leadAssignmentRepository = leadAssignmentRepository;
         this.leadRepository = leadRepository;
         this.userRepository = userRepository;
         this.teamRepository = teamRepository;
+        this.notificationService = notificationService;
     }
 
 
@@ -269,7 +273,19 @@ public class LeadAssignmentService {
 
 
     // ============================================================
-    // REASSIGN SINGLE LEAD
+    // REASSIGN / TRANSFER SINGLE LEAD
+    //
+    // FLOW:
+    //
+    // OLD AGENT
+    //      ↓
+    // OLD ASSIGNMENT = INACTIVE
+    //      ↓
+    // NEW AGENT + NEW TEAM
+    //      ↓
+    // NEW ASSIGNMENT = ACTIVE
+    //      ↓
+    // NOTIFICATION TO NEW AGENT
     // ============================================================
 
     @Transactional
@@ -337,9 +353,11 @@ public class LeadAssignmentService {
         // CHECK NEW TEAM
         // --------------------------------------------------------
 
+        Team newTeam = null;
+
         if (newTeamId != null) {
 
-            Team newTeam =
+            newTeam =
                     teamRepository.findById(newTeamId)
                             .orElseThrow(() ->
                                     new ResourceNotFoundException(
@@ -369,7 +387,7 @@ public class LeadAssignmentService {
 
         // --------------------------------------------------------
         // IF SAME AGENT + SAME TEAM
-        // NO NEED TO CREATE DUPLICATE ASSIGNMENT
+        // NO NEED TO TRANSFER
         // --------------------------------------------------------
 
         if (currentAssignment.isPresent()) {
@@ -393,6 +411,23 @@ public class LeadAssignmentService {
 
                 return oldAssignment;
             }
+        }
+
+
+        // --------------------------------------------------------
+        // STORE OLD ASSIGNMENT INFORMATION
+        // --------------------------------------------------------
+
+        Long oldAgentId = null;
+        Long oldTeamId = null;
+
+        if (currentAssignment.isPresent()) {
+
+            LeadAssignment oldAssignment =
+                    currentAssignment.get();
+
+            oldAgentId = oldAssignment.getAgentId();
+            oldTeamId = oldAssignment.getTeamId();
         }
 
 
@@ -434,22 +469,50 @@ public class LeadAssignmentService {
                 LeadAssignment.AssignmentStatus.ACTIVE);
 
 
-        return leadAssignmentRepository.save(
-                newAssignment);
+        LeadAssignment savedAssignment =
+                leadAssignmentRepository.save(
+                        newAssignment);
+
+
+        // --------------------------------------------------------
+        // CREATE NOTIFICATION FOR NEW AGENT
+        // --------------------------------------------------------
+
+        String teamText;
+
+        if (newTeam != null) {
+
+            teamText =
+                    " Team ID: " + newTeam.getId();
+
+        } else {
+
+            teamText =
+                    "";
+        }
+
+
+        String notificationMessage =
+                "Lead #" + leadId
+                        + " has been transferred to you."
+                        + teamText;
+
+
+        notificationService.createNotification(
+                newAgentId,
+                "LEAD_TRANSFERRED",
+                "Lead Transferred",
+                notificationMessage,
+                savedAssignment.getId()
+        );
+
+
+        return savedAssignment;
     }
 
 
     // ============================================================
     // REOPEN CLOSED LEAD AND ASSIGN
-    //
-    // FLOW:
-    // CLOSED LEAD
-    //      ↓
-    // STATUS = NEW
-    //      ↓
-    // OLD ACTIVE ASSIGNMENT (IF ANY) = INACTIVE
-    //      ↓
-    // NEW AGENT + TEAM = ACTIVE
     // ============================================================
 
     @Transactional
@@ -536,7 +599,7 @@ public class LeadAssignmentService {
 
         if (newTeamId != null) {
 
-            Team newTeam =
+            Team team =
                     teamRepository.findById(
                             newTeamId
                     ).orElseThrow(() ->
@@ -544,7 +607,7 @@ public class LeadAssignmentService {
                                     "Team not found"));
 
 
-            if (newTeam.getStatus()
+            if (team.getStatus()
                     != Team.TeamStatus.ACTIVE) {
 
                 throw new IllegalArgumentException(
@@ -555,9 +618,6 @@ public class LeadAssignmentService {
 
         // --------------------------------------------------------
         // DEACTIVATE ANY OLD ACTIVE ASSIGNMENT
-        //
-        // This also protects against old/inconsistent data where
-        // a closed lead still has an ACTIVE assignment.
         // --------------------------------------------------------
 
         Optional<LeadAssignment> existingActiveAssignment =
@@ -620,11 +680,6 @@ public class LeadAssignmentService {
 
     // ============================================================
     // BULK LEAD ASSIGNMENT
-    //
-    // IMPORTANT:
-    // - Unassigned leads are assigned
-    // - Already assigned leads are skipped
-    // - Closed leads are rejected
     // ============================================================
 
     @Transactional
@@ -704,7 +759,6 @@ public class LeadAssignmentService {
         // --------------------------------------------------------
 
         for (Long leadId : leadIds) {
-
 
             if (leadId == null) {
                 continue;

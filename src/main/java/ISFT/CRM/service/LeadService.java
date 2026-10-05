@@ -1,5 +1,6 @@
 package ISFT.CRM.service;
 
+import ISFT.CRM.dto.AgentLeadDetailsUpdateRequest;
 import ISFT.CRM.entity.Lead;
 import ISFT.CRM.entity.LeadAssignment;
 import ISFT.CRM.entity.User;
@@ -47,6 +48,7 @@ public class LeadService {
         this.noteRepository = noteRepository;
         this.userRepository = userRepository;
     }
+
 
     // ==========================================
     // GET ALL LEADS
@@ -109,6 +111,7 @@ public class LeadService {
     // ==========================================
 
     public List<Lead> getLeadsByCampaign(Long campaignId) {
+
         return leadRepository.findByCampaignId(campaignId);
     }
 
@@ -128,10 +131,12 @@ public class LeadService {
             return Collections.emptyList();
         }
 
-        boolean isAgent = authentication.getAuthorities()
-                .stream()
-                .anyMatch(authority ->
-                        authority.getAuthority().equals("ROLE_AGENT"));
+        boolean isAgent =
+                authentication.getAuthorities()
+                        .stream()
+                        .anyMatch(authority ->
+                                authority.getAuthority()
+                                        .equals("ROLE_AGENT"));
 
         if (!isAgent) {
             return leadRepository.findAll();
@@ -139,19 +144,21 @@ public class LeadService {
 
         String email = authentication.getName();
 
-        Long agentId = userRepository.findByEmail(email)
-                .map(User::getId)
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Authenticated user not found"));
+        Long agentId =
+                userRepository.findByEmail(email)
+                        .map(User::getId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Authenticated user not found"));
 
-        List<Long> leadIds = leadAssignmentRepository
-                .findByAgentIdAndStatus(
-                        agentId,
-                        LeadAssignment.AssignmentStatus.ACTIVE)
-                .stream()
-                .map(LeadAssignment::getLeadId)
-                .collect(Collectors.toList());
+        List<Long> leadIds =
+                leadAssignmentRepository
+                        .findByAgentIdAndStatus(
+                                agentId,
+                                LeadAssignment.AssignmentStatus.ACTIVE)
+                        .stream()
+                        .map(LeadAssignment::getLeadId)
+                        .collect(Collectors.toList());
 
         if (leadIds.isEmpty()) {
             return Collections.emptyList();
@@ -176,10 +183,12 @@ public class LeadService {
             return Optional.empty();
         }
 
-        boolean isAgent = authentication.getAuthorities()
-                .stream()
-                .anyMatch(authority ->
-                        authority.getAuthority().equals("ROLE_AGENT"));
+        boolean isAgent =
+                authentication.getAuthorities()
+                        .stream()
+                        .anyMatch(authority ->
+                                authority.getAuthority()
+                                        .equals("ROLE_AGENT"));
 
         Optional<Lead> leadOptional =
                 leadRepository.findById(id);
@@ -194,11 +203,12 @@ public class LeadService {
 
         String email = authentication.getName();
 
-        Long agentId = userRepository.findByEmail(email)
-                .map(User::getId)
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Authenticated user not found"));
+        Long agentId =
+                userRepository.findByEmail(email)
+                        .map(User::getId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Authenticated user not found"));
 
         boolean assignedToAgent =
                 leadAssignmentRepository
@@ -206,7 +216,8 @@ public class LeadService {
                                 id,
                                 LeadAssignment.AssignmentStatus.ACTIVE)
                         .map(assignment ->
-                                assignment.getAgentId().equals(agentId))
+                                assignment.getAgentId()
+                                        .equals(agentId))
                         .orElse(false);
 
         if (!assignedToAgent) {
@@ -399,7 +410,6 @@ public class LeadService {
 
                 throw new RuntimeException(
                         "You are not allowed to update the status of this lead");
-
             }
         }
 
@@ -449,6 +459,246 @@ public class LeadService {
 
 
     // ==========================================
+    // UPDATE LEAD DETAILS BY AGENT
+    // AGENT → ONLY HIS OWN ACTIVE LEADS
+    // ADMIN / MANAGER → ANY LEAD
+    // ==========================================
+
+    @Transactional
+    public Lead updateLeadDetailsByAgent(
+            Long id,
+            AgentLeadDetailsUpdateRequest request) {
+
+        if (request == null) {
+
+            throw new IllegalArgumentException(
+                    "Lead details are required");
+        }
+
+
+        // ==========================================
+        // FIND LEAD
+        // ==========================================
+
+        Lead existingLead =
+                leadRepository.findById(id)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Lead not found"));
+
+
+        // ==========================================
+        // CURRENT AUTHENTICATED USER
+        // ==========================================
+
+        Authentication authentication =
+                SecurityContextHolder
+                        .getContext()
+                        .getAuthentication();
+
+        if (authentication == null ||
+                authentication.getAuthorities().isEmpty()) {
+
+            throw new RuntimeException(
+                    "Unauthorized access");
+        }
+
+
+        // ==========================================
+        // CHECK IF CURRENT USER IS AGENT
+        // ==========================================
+
+        boolean isAgent =
+                authentication.getAuthorities()
+                        .stream()
+                        .anyMatch(authority ->
+                                authority.getAuthority()
+                                        .equals("ROLE_AGENT"));
+
+
+        // ==========================================
+        // AGENT → ONLY HIS ACTIVE ASSIGNED LEADS
+        // ==========================================
+
+        if (isAgent) {
+
+            String email =
+                    authentication.getName();
+
+            Long agentId =
+                    userRepository.findByEmail(email)
+                            .map(User::getId)
+                            .orElseThrow(() ->
+                                    new RuntimeException(
+                                            "Authenticated user not found"));
+
+
+            boolean assignedToAgent =
+                    leadAssignmentRepository
+                            .findByLeadIdAndStatus(
+                                    id,
+                                    LeadAssignment.AssignmentStatus.ACTIVE)
+                            .map(assignment ->
+                                    assignment.getAgentId()
+                                            .equals(agentId))
+                            .orElse(false);
+
+
+            if (!assignedToAgent) {
+
+                throw new RuntimeException(
+                        "You are not allowed to update this lead");
+            }
+        }
+
+
+        // ==========================================
+        // VALIDATE FULL NAME
+        // ==========================================
+
+        if (request.getFullName() == null ||
+                request.getFullName().trim().isEmpty()) {
+
+            throw new IllegalArgumentException(
+                    "Lead full name is required");
+        }
+
+
+        // ==========================================
+        // VALIDATE PHONE
+        // ==========================================
+
+        if (request.getPhone() == null ||
+                request.getPhone().trim().isEmpty()) {
+
+            throw new IllegalArgumentException(
+                    "Lead phone number is required");
+        }
+
+        if (!request.getPhone()
+                .matches("\\+?[0-9]{10,15}")) {
+
+            throw new IllegalArgumentException(
+                    "Lead phone number must contain 10 to 15 digits");
+        }
+
+
+        // ==========================================
+        // CHECK DUPLICATE PHONE
+        // ==========================================
+
+        if (leadRepository.existsByPhoneAndIdNot(
+                request.getPhone(),
+                id)) {
+
+            throw new IllegalArgumentException(
+                    "A lead with this phone number already exists");
+        }
+
+
+        // ==========================================
+        // VALIDATE AGE
+        // ==========================================
+
+        if (request.getAge() != null &&
+                (request.getAge() < 1 ||
+                        request.getAge() > 120)) {
+
+            throw new IllegalArgumentException(
+                    "Age must be between 1 and 120");
+        }
+
+
+        // ==========================================
+        // UPDATE ALLOWED DETAILS
+        // ==========================================
+
+        existingLead.setFullName(
+                request.getFullName().trim());
+
+        existingLead.setEmail(
+                cleanLeadDetail(request.getEmail()));
+
+        existingLead.setPhone(
+                request.getPhone().trim());
+
+        existingLead.setAge(
+                request.getAge());
+
+        existingLead.setCity(
+                cleanLeadDetail(request.getCity()));
+
+        existingLead.setEducation(
+                cleanLeadDetail(request.getEducation()));
+
+        existingLead.setCurrentProfession(
+                cleanLeadDetail(request.getCurrentProfession()));
+
+        existingLead.setPrimaryObjective(
+                cleanLeadDetail(request.getPrimaryObjective()));
+
+        existingLead.setTradingInvestmentExperience(
+                cleanLeadDetail(
+                        request.getTradingInvestmentExperience()));
+
+        existingLead.setCustomerLookingFor(
+                cleanLeadDetail(
+                        request.getCustomerLookingFor()));
+
+        existingLead.setInterestedArea(
+                cleanLeadDetail(
+                        request.getInterestedArea()));
+
+
+        // ==========================================
+        // UPDATE PRIORITY
+        // ==========================================
+
+        if (request.getPriority() != null) {
+
+            existingLead.setPriority(
+                    request.getPriority());
+        }
+
+
+        // ==========================================
+        // UPDATE STATUS
+        // ==========================================
+
+        if (request.getStatus() != null) {
+
+            existingLead.setStatus(
+                    request.getStatus());
+        }
+
+
+        // ==========================================
+        // SAVE
+        // ==========================================
+
+        return leadRepository.save(existingLead);
+    }
+
+
+    // ==========================================
+    // CLEAN LEAD DETAIL
+    // ==========================================
+
+    private String cleanLeadDetail(String value) {
+
+        if (value == null) {
+            return null;
+        }
+
+        String trimmed = value.trim();
+
+        return trimmed.isEmpty()
+                ? null
+                : trimmed;
+    }
+
+
+    // ==========================================
     // DELETE LEAD
     // ==========================================
 
@@ -456,6 +706,7 @@ public class LeadService {
     public void deleteLead(Long id) {
 
         if (!leadRepository.existsById(id)) {
+
             throw new ResourceNotFoundException(
                     "Lead not found");
         }

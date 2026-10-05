@@ -1,5 +1,6 @@
 package ISFT.CRM.controller;
 
+import ISFT.CRM.dto.AgentLeadDetailsUpdateRequest;
 import ISFT.CRM.entity.Lead;
 import ISFT.CRM.entity.LeadAssignment;
 import ISFT.CRM.service.LeadAssignmentService;
@@ -23,6 +24,11 @@ public class AgentLeadController {
         this.leadAssignmentService = leadAssignmentService;
     }
 
+
+    // ==========================================
+    // UPDATE LEAD STATUS
+    // ==========================================
+
     @PutMapping("/leads/{id}/status")
     public Lead updateLeadStatus(
             @PathVariable Long id,
@@ -31,10 +37,35 @@ public class AgentLeadController {
         return leadService.updateLeadStatus(id, status);
     }
 
+
+    // ==========================================
+    // UPDATE LEAD DETAILS
+    // AGENT → ONLY HIS ASSIGNED LEAD
+    // ADMIN / MANAGER → ANY LEAD
+    // ==========================================
+
+    @PutMapping("/leads/{id}/details")
+    public Lead updateLeadDetails(
+            @PathVariable Long id,
+            @RequestBody AgentLeadDetailsUpdateRequest request) {
+
+        return leadService.updateLeadDetailsByAgent(
+                id,
+                request
+        );
+    }
+
+
+    // ==========================================
+    // GET MY LEADS
+    // ==========================================
+
     @GetMapping("/leads/{agentId}")
     public List<LeadAssignment> getMyLeads(
             @PathVariable Long agentId) {
 
-        return leadAssignmentService.getActiveAssignmentsByAgent(agentId);
+        return leadAssignmentService.getActiveAssignmentsByAgent(
+                agentId
+        );
     }
 }

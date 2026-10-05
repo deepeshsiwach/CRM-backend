@@ -87,7 +87,23 @@ public class SecurityConfig {
 
 
                         // ==================================================
-                        // USERS
+                        // USERS - AGENTS CAN READ USERS
+                        // This is required for the Transfer Lead popup
+                        // ==================================================
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/users/**"
+                        )
+                        .hasAnyRole(
+                                "ADMIN",
+                                "MANAGER",
+                                "AGENT"
+                        )
+
+
+                        // ==================================================
+                        // USERS - ONLY ADMIN CAN CREATE / UPDATE / DELETE
                         // ==================================================
 
                         .requestMatchers("/api/users/**")
@@ -177,7 +193,25 @@ public class SecurityConfig {
 
 
                         // ==================================================
-                        // LEAD ASSIGNMENTS
+                        // LEAD TRANSFER / REASSIGN
+                        //
+                        // AGENT IS ALLOWED TO TRANSFER A LEAD
+                        // ==================================================
+
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/lead-assignments/*/reassign"
+                        )
+                        .hasAnyRole(
+                                "ADMIN",
+                                "MANAGER",
+                                "AGENT"
+                        )
+
+
+                        // ==================================================
+                        // OTHER LEAD ASSIGNMENT OPERATIONS
+                        // ADMIN + MANAGER ONLY
                         // ==================================================
 
                         .requestMatchers("/api/lead-assignments/**")
@@ -235,17 +269,28 @@ public class SecurityConfig {
 
 
                         // ==================================================
-                        // TEAMS
-                        //
-                        // AGENT CAN NOW READ TEAMS FOR
-                        // THE TRANSFER LEAD POPUP
+                        // TEAMS - AGENTS CAN READ TEAMS
+                        // ==================================================
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/teams/**"
+                        )
+                        .hasAnyRole(
+                                "ADMIN",
+                                "MANAGER",
+                                "AGENT"
+                        )
+
+
+                        // ==================================================
+                        // TEAMS - ONLY ADMIN + MANAGER CAN MANAGE
                         // ==================================================
 
                         .requestMatchers("/api/teams/**")
                         .hasAnyRole(
                                 "ADMIN",
-                                "MANAGER",
-                                "AGENT"
+                                "MANAGER"
                         )
 
 

@@ -14,6 +14,9 @@ import ISFT.CRM.repository.LeadAssignmentRepository;
 import ISFT.CRM.repository.LeadRepository;
 import ISFT.CRM.repository.UserRepository;
 
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,6 +38,7 @@ public class DashboardController {
     private final UserRepository userRepository;
     private final CallLogRepository callLogRepository;
     private final CampaignRepository campaignRepository;
+
 
     public DashboardController(
             LeadRepository leadRepository,
@@ -60,11 +64,31 @@ public class DashboardController {
     @GetMapping("/summary")
     public Map<String, Object> getDashboardSummary() {
 
-        List<Lead> leads =
-                leadRepository.findAll();
+        Authentication authentication =
+                SecurityContextHolder
+                        .getContext()
+                        .getAuthentication();
 
-        List<FollowUp> followUps =
-                followUpRepository.findAll();
+
+        if (authentication == null ||
+                authentication.getAuthorities().isEmpty()) {
+
+            throw new RuntimeException(
+                    "Unauthorized access");
+        }
+
+
+        boolean isAgent =
+                authentication.getAuthorities()
+                        .stream()
+                        .anyMatch(authority ->
+                                authority.getAuthority()
+                                        .equals("ROLE_AGENT"));
+
+
+        // ======================================================
+        // GET ACTIVE ASSIGNMENTS
+        // ======================================================
 
         List<LeadAssignment> activeAssignments =
                 leadAssignmentRepository.findByStatus(
@@ -72,18 +96,148 @@ public class DashboardController {
                 );
 
 
+        // ======================================================
+        // AGENT SECURITY FILTER
+        // ======================================================
+
+        if (isAgent) {
+
+            String email =
+                    authentication.getName();
+
+
+            Long agentId =
+                    userRepository
+                            .findByEmail(email)
+                            .map(User::getId)
+                            .orElseThrow(() ->
+                                    new RuntimeException(
+                                            "Authenticated user not found"
+                                    )
+                            );
+
+
+            // ----------------------------------------------
+            // ONLY THIS AGENT'S ACTIVE ASSIGNMENTS
+            // ----------------------------------------------
+
+            activeAssignments =
+                    activeAssignments.stream()
+                            .filter(assignment ->
+                                    assignment.getAgentId() != null
+                                            &&
+                                            assignment.getAgentId()
+                                                    .equals(agentId)
+                            )
+                            .toList();
+        }
+
+
+        // ======================================================
+        // GET LEADS
+        // ======================================================
+
+        List<Lead> leads;
+
+
+        if (isAgent) {
+
+            // Agent sees ONLY leads assigned to them
+
+            Set<Long> assignedLeadIds =
+                    new HashSet<>();
+
+
+            for (LeadAssignment assignment :
+                    activeAssignments) {
+
+                if (assignment.getLeadId() != null) {
+
+                    assignedLeadIds.add(
+                            assignment.getLeadId()
+                    );
+                }
+            }
+
+
+            leads =
+                    leadRepository.findAll()
+                            .stream()
+                            .filter(lead ->
+                                    lead.getId() != null
+                                            &&
+                                            assignedLeadIds.contains(
+                                                    lead.getId()
+                                            )
+                            )
+                            .toList();
+
+        } else {
+
+            // Admin / Manager see all leads
+
+            leads =
+                    leadRepository.findAll();
+        }
+
+
+        // ======================================================
+        // GET FOLLOW-UPS
+        // ======================================================
+
+        List<FollowUp> followUps;
+
+
+        if (isAgent) {
+
+            String email =
+                    authentication.getName();
+
+
+            Long agentId =
+                    userRepository
+                            .findByEmail(email)
+                            .map(User::getId)
+                            .orElseThrow(() ->
+                                    new RuntimeException(
+                                            "Authenticated user not found"
+                                    )
+                            );
+
+
+            // Agent gets ONLY their follow-ups
+
+            followUps =
+                    followUpRepository.findByAgentId(
+                            agentId
+                    );
+
+        } else {
+
+            // Admin / Manager get all follow-ups
+
+            followUps =
+                    followUpRepository.findAll();
+        }
+
+
+        // ======================================================
+        // SUMMARY OBJECT
+        // ======================================================
+
         Map<String, Object> summary =
                 new LinkedHashMap<>();
 
 
-        // ==========================================================
+        // ======================================================
         // LEAD SUMMARY
-        // ==========================================================
+        // ======================================================
 
         summary.put(
                 "totalLeads",
                 leads.size()
         );
+
 
         summary.put(
                 "newLeads",
@@ -93,6 +247,7 @@ public class DashboardController {
                 )
         );
 
+
         summary.put(
                 "contactedLeads",
                 countLeadStatus(
@@ -100,6 +255,7 @@ public class DashboardController {
                         Lead.LeadStatus.CONTACTED
                 )
         );
+
 
         summary.put(
                 "interestedLeads",
@@ -109,6 +265,7 @@ public class DashboardController {
                 )
         );
 
+
         summary.put(
                 "followUpLeads",
                 countLeadStatus(
@@ -116,6 +273,7 @@ public class DashboardController {
                         Lead.LeadStatus.FOLLOW_UP
                 )
         );
+
 
         summary.put(
                 "counsellingLeads",
@@ -125,6 +283,7 @@ public class DashboardController {
                 )
         );
 
+
         summary.put(
                 "enrolledLeads",
                 countLeadStatus(
@@ -132,6 +291,7 @@ public class DashboardController {
                         Lead.LeadStatus.ENROLLED
                 )
         );
+
 
         summary.put(
                 "notInterestedLeads",
@@ -141,6 +301,7 @@ public class DashboardController {
                 )
         );
 
+
         summary.put(
                 "wrongNumberLeads",
                 countLeadStatus(
@@ -149,6 +310,7 @@ public class DashboardController {
                 )
         );
 
+
         summary.put(
                 "noResponseLeads",
                 countLeadStatus(
@@ -156,6 +318,7 @@ public class DashboardController {
                         Lead.LeadStatus.NO_RESPONSE
                 )
         );
+
 
         summary.put(
                 "lostLeads",
@@ -166,32 +329,47 @@ public class DashboardController {
         );
 
 
-        // ==========================================================
+        // ======================================================
         // ASSIGNMENT SUMMARY
-        // ==========================================================
+        // ======================================================
 
         summary.put(
                 "assignedLeads",
                 activeAssignments.size()
         );
 
-        summary.put(
-                "unassignedLeads",
-                countUnassignedOpenLeads(
-                        leads,
-                        activeAssignments
-                )
-        );
+
+        // IMPORTANT:
+        // Agent must NEVER see company-wide unassigned leads.
+
+        if (isAgent) {
+
+            summary.put(
+                    "unassignedLeads",
+                    0
+            );
+
+        } else {
+
+            summary.put(
+                    "unassignedLeads",
+                    countUnassignedOpenLeads(
+                            leads,
+                            activeAssignments
+                    )
+            );
+        }
 
 
-        // ==========================================================
+        // ======================================================
         // FOLLOW-UP SUMMARY
-        // ==========================================================
+        // ======================================================
 
         summary.put(
                 "totalFollowUps",
                 followUps.size()
         );
+
 
         summary.put(
                 "pendingFollowUps",
@@ -201,6 +379,7 @@ public class DashboardController {
                 )
         );
 
+
         summary.put(
                 "completedFollowUps",
                 countFollowUpStatus(
@@ -209,6 +388,7 @@ public class DashboardController {
                 )
         );
 
+
         summary.put(
                 "missedFollowUps",
                 countFollowUpStatus(
@@ -216,6 +396,7 @@ public class DashboardController {
                         FollowUp.FollowUpStatus.MISSED
                 )
         );
+
 
         summary.put(
                 "cancelledFollowUps",
@@ -226,51 +407,81 @@ public class DashboardController {
         );
 
 
-        // ==========================================================
-        // AGENT-WISE ACTIVE LEAD DISTRIBUTION
-        // ==========================================================
+        // ======================================================
+        // MANAGEMENT ANALYTICS
+        // ======================================================
+        //
+        // These MUST NOT be returned to AGENT.
+        //
+        // Agent:
+        //   []
+        //
+        // Admin / Manager:
+        //   Full analytics
+        //
+        // ======================================================
 
-        summary.put(
-                "agentLeadDistribution",
-                buildAgentLeadDistribution(
-                        activeAssignments
-                )
-        );
+        if (isAgent) {
 
-
-        // ==========================================================
-        // AGENT PERFORMANCE
-        // ==========================================================
-
-        summary.put(
-                "agentPerformance",
-                buildAgentPerformance(
-                        activeAssignments
-                )
-        );
+            summary.put(
+                    "agentLeadDistribution",
+                    List.of()
+            );
 
 
-        // ==========================================================
-        // CAMPAIGN PERFORMANCE
-        // ==========================================================
-
-        summary.put(
-                "campaignPerformance",
-                buildCampaignPerformance()
-        );
+            summary.put(
+                    "agentPerformance",
+                    List.of()
+            );
 
 
-        // ==========================================================
-        // LEAD SOURCE PERFORMANCE
-        // ==========================================================
+            summary.put(
+                    "campaignPerformance",
+                    List.of()
+            );
 
-        summary.put(
-                "leadSourcePerformance",
-                buildLeadSourcePerformance(
-                        leads
-                )
-        );
 
+            summary.put(
+                    "leadSourcePerformance",
+                    List.of()
+            );
+
+        } else {
+
+            summary.put(
+                    "agentLeadDistribution",
+                    buildAgentLeadDistribution(
+                            activeAssignments
+                    )
+            );
+
+
+            summary.put(
+                    "agentPerformance",
+                    buildAgentPerformance(
+                            activeAssignments
+                    )
+            );
+
+
+            summary.put(
+                    "campaignPerformance",
+                    buildCampaignPerformance()
+            );
+
+
+            summary.put(
+                    "leadSourcePerformance",
+                    buildLeadSourcePerformance(
+                            leads
+                    )
+            );
+        }
+
+
+        // ======================================================
+        // RETURN
+        // ======================================================
 
         return summary;
     }
@@ -278,9 +489,11 @@ public class DashboardController {
 
     // ==========================================================
     // AGENT-WISE ACTIVE LEAD DISTRIBUTION
+    // ADMIN / MANAGER ONLY
     // ==========================================================
 
-    private List<Map<String, Object>> buildAgentLeadDistribution(
+    private List<Map<String, Object>>
+    buildAgentLeadDistribution(
             List<LeadAssignment> activeAssignments) {
 
         List<User> activeAgents =
@@ -291,16 +504,16 @@ public class DashboardController {
                 new ArrayList<>();
 
 
-        for (User agent : activeAgents) {
+        for (User agent :
+                activeAgents) {
 
             long activeLeadCount =
                     activeAssignments.stream()
-                            .filter(
-                                    assignment ->
-                                            assignment.getAgentId() != null
-                                                    &&
-                                                    assignment.getAgentId()
-                                                            .equals(agent.getId())
+                            .filter(assignment ->
+                                    assignment.getAgentId() != null
+                                            &&
+                                            assignment.getAgentId()
+                                                    .equals(agent.getId())
                             )
                             .count();
 
@@ -314,10 +527,12 @@ public class DashboardController {
                     agent.getId()
             );
 
+
             agentData.put(
                     "agentName",
                     agent.getFullName()
             );
+
 
             agentData.put(
                     "activeLeads",
@@ -325,7 +540,9 @@ public class DashboardController {
             );
 
 
-            result.add(agentData);
+            result.add(
+                    agentData
+            );
         }
 
 
@@ -335,9 +552,11 @@ public class DashboardController {
 
     // ==========================================================
     // AGENT PERFORMANCE
+    // ADMIN / MANAGER ONLY
     // ==========================================================
 
-    private List<Map<String, Object>> buildAgentPerformance(
+    private List<Map<String, Object>>
+    buildAgentPerformance(
             List<LeadAssignment> activeAssignments) {
 
         List<User> activeAgents =
@@ -348,7 +567,8 @@ public class DashboardController {
                 new ArrayList<>();
 
 
-        for (User agent : activeAgents) {
+        for (User agent :
+                activeAgents) {
 
             Long agentId =
                     agent.getId();
@@ -360,12 +580,11 @@ public class DashboardController {
 
             long activeLeadCount =
                     activeAssignments.stream()
-                            .filter(
-                                    assignment ->
-                                            assignment.getAgentId() != null
-                                                    &&
-                                                    assignment.getAgentId()
-                                                            .equals(agentId)
+                            .filter(assignment ->
+                                    assignment.getAgentId() != null
+                                            &&
+                                            assignment.getAgentId()
+                                                    .equals(agentId)
                             )
                             .count();
 
@@ -392,12 +611,15 @@ public class DashboardController {
                     new HashSet<>();
 
 
-            for (CallLog callLog : agentCalls) {
+            for (CallLog callLog :
+                    agentCalls) {
 
                 if (
                         callLog.getCallOutcome() ==
                                 CallLog.CallOutcome.ENROLLED
+
                                 &&
+
                                 callLog.getLeadId() != null
                 ) {
 
@@ -413,7 +635,7 @@ public class DashboardController {
 
 
             // ------------------------------------------
-            // CREATE PERFORMANCE OBJECT
+            // PERFORMANCE OBJECT
             // ------------------------------------------
 
             Map<String, Object> agentData =
@@ -425,20 +647,24 @@ public class DashboardController {
                     agentId
             );
 
+
             agentData.put(
                     "agentName",
                     agent.getFullName()
             );
+
 
             agentData.put(
                     "activeLeads",
                     activeLeadCount
             );
 
+
             agentData.put(
                     "totalCalls",
                     totalCalls
             );
+
 
             agentData.put(
                     "enrolledLeads",
@@ -446,7 +672,9 @@ public class DashboardController {
             );
 
 
-            result.add(agentData);
+            result.add(
+                    agentData
+            );
         }
 
 
@@ -456,9 +684,11 @@ public class DashboardController {
 
     // ==========================================================
     // CAMPAIGN PERFORMANCE
+    // ADMIN / MANAGER ONLY
     // ==========================================================
 
-    private List<Map<String, Object>> buildCampaignPerformance() {
+    private List<Map<String, Object>>
+    buildCampaignPerformance() {
 
         List<Campaign> campaigns =
                 campaignRepository.findAll();
@@ -468,16 +698,14 @@ public class DashboardController {
                 new ArrayList<>();
 
 
-        for (Campaign campaign : campaigns) {
+        for (Campaign campaign :
+                campaigns) {
 
             if (campaign.getId() == null) {
+
                 continue;
             }
 
-
-            // ------------------------------------------
-            // GET LEADS FOR THIS CAMPAIGN
-            // ------------------------------------------
 
             List<Lead> campaignLeads =
                     leadRepository.findByCampaignId(
@@ -489,23 +717,14 @@ public class DashboardController {
                     campaignLeads.size();
 
 
-            // ------------------------------------------
-            // COUNT ENROLLED LEADS
-            // ------------------------------------------
-
             long enrolledCampaignLeads =
                     campaignLeads.stream()
-                            .filter(
-                                    lead ->
-                                            lead.getStatus() ==
-                                                    Lead.LeadStatus.ENROLLED
+                            .filter(lead ->
+                                    lead.getStatus() ==
+                                            Lead.LeadStatus.ENROLLED
                             )
                             .count();
 
-
-            // ------------------------------------------
-            // CREATE CAMPAIGN DATA
-            // ------------------------------------------
 
             Map<String, Object> campaignData =
                     new LinkedHashMap<>();
@@ -516,25 +735,30 @@ public class DashboardController {
                     campaign.getId()
             );
 
+
             campaignData.put(
                     "campaignName",
                     campaign.getCampaignName()
             );
+
 
             campaignData.put(
                     "source",
                     campaign.getSource()
             );
 
+
             campaignData.put(
                     "status",
                     campaign.getStatus()
             );
 
+
             campaignData.put(
                     "totalLeads",
                     totalCampaignLeads
             );
+
 
             campaignData.put(
                     "enrolledLeads",
@@ -542,7 +766,9 @@ public class DashboardController {
             );
 
 
-            result.add(campaignData);
+            result.add(
+                    campaignData
+            );
         }
 
 
@@ -552,20 +778,19 @@ public class DashboardController {
 
     // ==========================================================
     // LEAD SOURCE PERFORMANCE
+    // ADMIN / MANAGER ONLY
     // ==========================================================
 
-    private List<Map<String, Object>> buildLeadSourcePerformance(
+    private List<Map<String, Object>>
+    buildLeadSourcePerformance(
             List<Lead> leads) {
 
         Map<String, List<Lead>> leadsBySource =
                 new LinkedHashMap<>();
 
 
-        // ------------------------------------------
-        // GROUP LEADS BY SOURCE
-        // ------------------------------------------
-
-        for (Lead lead : leads) {
+        for (Lead lead :
+                leads) {
 
             String source =
                     lead.getLeadSource();
@@ -580,23 +805,20 @@ public class DashboardController {
 
             } else {
 
-                source = source.trim();
-
+                source =
+                        source.trim();
             }
 
 
             leadsBySource
                     .computeIfAbsent(
                             source,
-                            key -> new ArrayList<>()
+                            key ->
+                                    new ArrayList<>()
                     )
                     .add(lead);
         }
 
-
-        // ------------------------------------------
-        // BUILD RESULT
-        // ------------------------------------------
 
         List<Map<String, Object>> result =
                 new ArrayList<>();
@@ -621,10 +843,9 @@ public class DashboardController {
 
             long enrolledLeads =
                     sourceLeads.stream()
-                            .filter(
-                                    lead ->
-                                            lead.getStatus() ==
-                                                    Lead.LeadStatus.ENROLLED
+                            .filter(lead ->
+                                    lead.getStatus() ==
+                                            Lead.LeadStatus.ENROLLED
                             )
                             .count();
 
@@ -632,16 +853,14 @@ public class DashboardController {
             double conversionRate =
                     totalLeads == 0
                             ? 0.0
-                            : (
-                            (double) enrolledLeads
-                                    /
-                                    totalLeads
-                    ) * 100.0;
+                            :
+                            (
+                                    (double)
+                                            enrolledLeads
+                                            /
+                                            totalLeads
+                            ) * 100.0;
 
-
-            // ------------------------------------------
-            // CREATE SOURCE OBJECT
-            // ------------------------------------------
 
             Map<String, Object> sourceData =
                     new LinkedHashMap<>();
@@ -652,15 +871,18 @@ public class DashboardController {
                     source
             );
 
+
             sourceData.put(
                     "totalLeads",
                     totalLeads
             );
 
+
             sourceData.put(
                     "enrolledLeads",
                     enrolledLeads
             );
+
 
             sourceData.put(
                     "conversionRate",
@@ -670,7 +892,9 @@ public class DashboardController {
             );
 
 
-            result.add(sourceData);
+            result.add(
+                    sourceData
+            );
         }
 
 
@@ -682,19 +906,19 @@ public class DashboardController {
     // GET ACTIVE AGENTS
     // ==========================================================
 
-    private List<User> getActiveAgents() {
+    private List<User>
+    getActiveAgents() {
 
-        return userRepository.findAll()
+        return userRepository
+                .findAll()
                 .stream()
-                .filter(
-                        user ->
-                                user.getRole() ==
-                                        User.Role.AGENT
+                .filter(user ->
+                        user.getRole() ==
+                                User.Role.AGENT
                 )
-                .filter(
-                        user ->
-                                user.getStatus() ==
-                                        User.Status.ACTIVE
+                .filter(user ->
+                        user.getStatus() ==
+                                User.Status.ACTIVE
                 )
                 .toList();
     }
@@ -709,9 +933,9 @@ public class DashboardController {
             Lead.LeadStatus status) {
 
         return leads.stream()
-                .filter(
-                        lead ->
-                                lead.getStatus() == status
+                .filter(lead ->
+                        lead.getStatus() ==
+                                status
                 )
                 .count();
     }
@@ -726,9 +950,9 @@ public class DashboardController {
             FollowUp.FollowUpStatus status) {
 
         return followUps.stream()
-                .filter(
-                        followUp ->
-                                followUp.getStatus() == status
+                .filter(followUp ->
+                        followUp.getStatus() ==
+                                status
                 )
                 .count();
     }
@@ -741,7 +965,6 @@ public class DashboardController {
     private long countUnassignedOpenLeads(
             List<Lead> leads,
             List<LeadAssignment> activeAssignments) {
-
 
         Set<Long> assignedLeadIds =
                 new HashSet<>();
@@ -762,17 +985,16 @@ public class DashboardController {
 
 
         return leads.stream()
-                .filter(
-                        lead ->
-                                lead.getId() != null
-                                        &&
-                                        !assignedLeadIds.contains(
-                                                lead.getId()
-                                        )
-                                        &&
-                                        !isClosedLead(
-                                                lead
-                                        )
+                .filter(lead ->
+                        lead.getId() != null
+                                &&
+                                !assignedLeadIds.contains(
+                                        lead.getId()
+                                )
+                                &&
+                                !isClosedLead(
+                                        lead
+                                )
                 )
                 .count();
     }
@@ -786,6 +1008,7 @@ public class DashboardController {
             Lead lead) {
 
         if (lead.getStatus() == null) {
+
             return false;
         }
 

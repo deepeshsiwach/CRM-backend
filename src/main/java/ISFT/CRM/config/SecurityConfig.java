@@ -209,17 +209,17 @@ public class SecurityConfig {
                         )
 
 
-                        // ==================================================
-                        // OTHER LEAD ASSIGNMENT OPERATIONS
-                        // ADMIN + MANAGER ONLY
-                        // ==================================================
+                                // ==================================================
+                                //  OTHER LEAD ASSIGNMENT OPERATIONS
+                                // ADMIN + MANAGER + AGENT
+                                // ==================================================
 
-                        .requestMatchers("/api/lead-assignments/**")
-                        .hasAnyRole(
-                                "ADMIN",
-                                "MANAGER"
-                        )
-
+                                .requestMatchers("/api/lead-assignments/**")
+                                .hasAnyRole(
+                                        "ADMIN",
+                                        "MANAGER",
+                                        "AGENT"
+                                )
 
                         // ==================================================
                         // CALL LOGS

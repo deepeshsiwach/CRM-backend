@@ -2,6 +2,7 @@ package ISFT.CRM.service;
 
 import ISFT.CRM.entity.User;
 import ISFT.CRM.repository.UserRepository;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -32,6 +33,7 @@ public class UserService {
         return userRepository.findByEmail(email);
     }
 
+    @CacheEvict(value = "userDetails", allEntries = true)
     public User createUser(User user) {
 
         // Validate full name
@@ -103,6 +105,7 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    @CacheEvict(value = "userDetails", allEntries = true)
     public User updateUser(Long id, User userDetails) {
 
         User existingUser = userRepository.findById(id)
@@ -183,6 +186,7 @@ public class UserService {
         return userRepository.save(existingUser);
     }
 
+    @CacheEvict(value = "userDetails", allEntries = true)
     public void deleteUser(Long id) {
 
         User existingUser = userRepository.findById(id)

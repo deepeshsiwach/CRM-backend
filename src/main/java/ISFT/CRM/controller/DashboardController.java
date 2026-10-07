@@ -21,12 +21,17 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/dashboard")
@@ -406,6 +411,49 @@ public class DashboardController {
                 )
         );
 
+        // ======================================================
+        // ADDITIONAL DASHBOARD METRICS (SPEED OPTIMIZATION)
+        // ======================================================
+
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
+        long todayFollowUps = followUps.stream()
+                .filter(fu -> fu.getFollowUpDate() != null
+                        && fu.getFollowUpDate().toLocalDate().isEqual(today))
+                .count();
+        summary.put("todayFollowUps", todayFollowUps);
+
+        Map<String, Long> statusCounts = new LinkedHashMap<>();
+        for (Lead.LeadStatus status : Lead.LeadStatus.values()) {
+            statusCounts.put(status.name(), countLeadStatus(leads, status));
+        }
+        summary.put("leadStatusCounts", statusCounts);
+
+        if (isAgent) {
+            String email = authentication.getName();
+            Long currentAgentId = userRepository.findByEmail(email).map(User::getId).orElse(null);
+            List<CallLog> agentCalls = currentAgentId != null
+                    ? callLogRepository.findByAgentId(currentAgentId)
+                    : Collections.emptyList();
+            summary.put("totalCalls", agentCalls.size());
+
+            Set<Long> attendedLeadIds = agentCalls.stream()
+                    .filter(c -> c.getCallStartTime() != null
+                            && c.getCallStartTime().toLocalDate().isEqual(today))
+                    .map(CallLog::getLeadId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            long attendedLeads = activeAssignments.stream()
+                    .map(LeadAssignment::getLeadId)
+                    .filter(id -> id != null && attendedLeadIds.contains(id))
+                    .count();
+            summary.put("attendedLeads", attendedLeads);
+            summary.put("remainingLeads", Math.max(0, leads.size() - attendedLeads));
+        } else {
+            summary.put("totalCalls", callLogRepository.count());
+            summary.put("attendedLeads", 0);
+            summary.put("remainingLeads", 0);
+        }
 
         // ======================================================
         // MANAGEMENT ANALYTICS
@@ -448,10 +496,13 @@ public class DashboardController {
 
         } else {
 
+            List<User> activeAgents = getActiveAgents();
+
             summary.put(
                     "agentLeadDistribution",
                     buildAgentLeadDistribution(
-                            activeAssignments
+                            activeAssignments,
+                            activeAgents
                     )
             );
 
@@ -459,14 +510,17 @@ public class DashboardController {
             summary.put(
                     "agentPerformance",
                     buildAgentPerformance(
-                            activeAssignments
+                            activeAssignments,
+                            activeAgents
                     )
             );
 
 
             summary.put(
                     "campaignPerformance",
-                    buildCampaignPerformance()
+                    buildCampaignPerformance(
+                            leads
+                    )
             );
 
 
@@ -494,11 +548,8 @@ public class DashboardController {
 
     private List<Map<String, Object>>
     buildAgentLeadDistribution(
-            List<LeadAssignment> activeAssignments) {
-
-        List<User> activeAgents =
-                getActiveAgents();
-
+            List<LeadAssignment> activeAssignments,
+            List<User> activeAgents) {
 
         List<Map<String, Object>> result =
                 new ArrayList<>();
@@ -557,15 +608,20 @@ public class DashboardController {
 
     private List<Map<String, Object>>
     buildAgentPerformance(
-            List<LeadAssignment> activeAssignments) {
-
-        List<User> activeAgents =
-                getActiveAgents();
-
+            List<LeadAssignment> activeAssignments,
+            List<User> activeAgents) {
 
         List<Map<String, Object>> result =
                 new ArrayList<>();
 
+        // PERFORMANCE OPTIMIZATION: Fetch all calls once in 1 query and group by agentId in memory
+        List<CallLog> allCalls =
+                callLogRepository.findAll();
+
+        Map<Long, List<CallLog>> callsByAgent =
+                allCalls.stream()
+                        .filter(call -> call.getAgentId() != null)
+                        .collect(Collectors.groupingBy(CallLog::getAgentId));
 
         for (User agent :
                 activeAgents) {
@@ -590,13 +646,11 @@ public class DashboardController {
 
 
             // ------------------------------------------
-            // CALL LOGS
+            // CALL LOGS (from in-memory map)
             // ------------------------------------------
 
             List<CallLog> agentCalls =
-                    callLogRepository.findByAgentId(
-                            agentId
-                    );
+                    callsByAgent.getOrDefault(agentId, Collections.emptyList());
 
 
             long totalCalls =
@@ -688,7 +742,7 @@ public class DashboardController {
     // ==========================================================
 
     private List<Map<String, Object>>
-    buildCampaignPerformance() {
+    buildCampaignPerformance(List<Lead> leads) {
 
         List<Campaign> campaigns =
                 campaignRepository.findAll();
@@ -697,6 +751,11 @@ public class DashboardController {
         List<Map<String, Object>> result =
                 new ArrayList<>();
 
+        // PERFORMANCE OPTIMIZATION: Group already loaded leads by campaignId in memory
+        Map<Long, List<Lead>> leadsByCampaign =
+                leads.stream()
+                        .filter(lead -> lead.getCampaignId() != null)
+                        .collect(Collectors.groupingBy(Lead::getCampaignId));
 
         for (Campaign campaign :
                 campaigns) {
@@ -708,9 +767,7 @@ public class DashboardController {
 
 
             List<Lead> campaignLeads =
-                    leadRepository.findByCampaignId(
-                            campaign.getId()
-                    );
+                    leadsByCampaign.getOrDefault(campaign.getId(), Collections.emptyList());
 
 
             long totalCampaignLeads =

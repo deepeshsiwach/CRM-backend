@@ -25,4 +25,10 @@ public interface NotificationRepository
             String type,
             Long referenceId
     );
+
+    List<Notification> findByUserIdAndTypeAndReferenceId(
+            Long userId,
+            String type,
+            Long referenceId
+    );
 }

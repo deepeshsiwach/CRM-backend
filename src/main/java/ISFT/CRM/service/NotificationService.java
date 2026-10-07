@@ -168,6 +168,37 @@ public class NotificationService {
 
 
     // ========================================
+    // MARK UPCOMING FOLLOW-UP NOTIFICATION AS READ
+    // ========================================
+
+    public void markUpcomingFollowUpAsRead(
+            Long userId,
+            Long followUpId) {
+
+        List<Notification> notifications =
+                notificationRepository
+                        .findByUserIdAndTypeAndReferenceId(
+                                userId,
+                                "FOLLOW_UP_REMINDER",
+                                followUpId
+                        );
+
+        for (Notification notification :
+                notifications) {
+
+            if (!notification.isRead()) {
+
+                notification.setRead(true);
+            }
+        }
+
+        notificationRepository.saveAll(
+                notifications
+        );
+    }
+
+
+    // ========================================
     // CREATE SYSTEM NOTIFICATION
     // ========================================
 

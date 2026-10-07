@@ -20,6 +20,7 @@ public class FollowUpReminderScheduler {
     private static final ZoneId INDIA_ZONE =
             ZoneId.of("Asia/Kolkata");
 
+
     public FollowUpReminderScheduler(
             FollowUpRepository followUpRepository,
             NotificationService notificationService) {
@@ -106,6 +107,16 @@ public class FollowUpReminderScheduler {
 
         for (FollowUp followUp :
                 overdueFollowUps) {
+
+
+            // ========================================
+            // MARK OLD UPCOMING NOTIFICATION AS READ
+            // ========================================
+
+            notificationService.markUpcomingFollowUpAsRead(
+                    followUp.getAgentId(),
+                    followUp.getId()
+            );
 
 
             // ========================================

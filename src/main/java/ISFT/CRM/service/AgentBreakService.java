@@ -291,6 +291,10 @@ public class AgentBreakService {
             activeBreakStartTime =
                     activeBreak
                             .getStartTime()
+                            .atOffset(
+                                    java.time.ZoneOffset.UTC
+                            )
+                            .toInstant()
                             .toString();
 
             activeBreakType =

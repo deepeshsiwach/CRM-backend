@@ -18,22 +18,22 @@ public class AgentBreakController {
 
     @PostMapping("/start")
     public AgentBreak startBreak(
-            @RequestParam Long agentId,
-            @RequestParam AgentBreak.BreakType breakType,
-            @RequestParam(required = false) String reason) {
+            @RequestBody StartBreakRequest request) {
 
         return agentBreakService.startBreak(
-                agentId,
-                breakType,
-                reason
+                request.getAgentId(),
+                request.getBreakType(),
+                request.getReason()
         );
     }
 
     @PostMapping("/end")
     public AgentBreak endBreak(
-            @RequestParam Long agentId) {
+            @RequestBody EndBreakRequest request) {
 
-        return agentBreakService.endBreak(agentId);
+        return agentBreakService.endBreak(
+                request.getAgentId()
+        );
     }
 
     @GetMapping("/active")
@@ -41,5 +41,53 @@ public class AgentBreakController {
             @RequestParam Long agentId) {
 
         return agentBreakService.getActiveBreak(agentId);
+    }
+
+    public static class StartBreakRequest {
+
+        private Long agentId;
+
+        private AgentBreak.BreakType breakType;
+
+        private String reason;
+
+        public Long getAgentId() {
+            return agentId;
+        }
+
+        public void setAgentId(Long agentId) {
+            this.agentId = agentId;
+        }
+
+        public AgentBreak.BreakType getBreakType() {
+            return breakType;
+        }
+
+        public void setBreakType(
+                AgentBreak.BreakType breakType) {
+
+            this.breakType = breakType;
+        }
+
+        public String getReason() {
+            return reason;
+        }
+
+        public void setReason(String reason) {
+            this.reason = reason;
+        }
+    }
+
+    public static class EndBreakRequest {
+
+        private Long agentId;
+
+        public Long getAgentId() {
+            return agentId;
+        }
+
+        public void setAgentId(Long agentId) {
+            this.agentId = agentId;
+        }
     }
 }

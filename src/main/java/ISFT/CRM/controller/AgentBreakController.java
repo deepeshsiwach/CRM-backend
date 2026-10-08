@@ -43,6 +43,13 @@ public class AgentBreakController {
         return agentBreakService.getActiveBreak(agentId);
     }
 
+    @GetMapping("/summary")
+    public AgentBreakService.BreakSummary getBreakSummary(
+            @RequestParam Long agentId) {
+
+        return agentBreakService.getBreakSummary(agentId);
+    }
+
     public static class StartBreakRequest {
 
         private Long agentId;

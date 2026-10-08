@@ -28,6 +28,11 @@ public class AgentBreakService {
         this.attendanceRepository = attendanceRepository;
     }
 
+
+    // ============================================================
+    // START BREAK
+    // ============================================================
+
     @Transactional
     public AgentBreak startBreak(
             Long agentId,
@@ -65,6 +70,12 @@ public class AgentBreakService {
             );
         }
 
+        if (breakType == null) {
+            throw new IllegalArgumentException(
+                    "Break type is required."
+            );
+        }
+
         if (breakType == AgentBreak.BreakType.EXCEPTION) {
 
             if (reason == null || reason.trim().isEmpty()) {
@@ -80,14 +91,23 @@ public class AgentBreakService {
         agentBreak.setAttendanceId(attendance.getId());
         agentBreak.setBreakType(breakType);
         agentBreak.setStartTime(LocalDateTime.now());
+
         agentBreak.setReason(
-                reason == null ? null : reason.trim()
+                reason == null
+                        ? null
+                        : reason.trim()
         );
+
         agentBreak.setDurationSeconds(null);
         agentBreak.setLimitAlertSent(false);
 
         return breakRepository.save(agentBreak);
     }
+
+
+    // ============================================================
+    // END BREAK
+    // ============================================================
 
     @Transactional
     public AgentBreak endBreak(Long agentId) {
@@ -103,7 +123,8 @@ public class AgentBreakService {
                                 )
                         );
 
-        LocalDateTime endTime = LocalDateTime.now();
+        LocalDateTime endTime =
+                LocalDateTime.now();
 
         long durationSeconds =
                 Duration.between(
@@ -117,6 +138,11 @@ public class AgentBreakService {
         return breakRepository.save(agentBreak);
     }
 
+
+    // ============================================================
+    // ACTIVE BREAK
+    // ============================================================
+
     public AgentBreak getActiveBreak(Long agentId) {
 
         return breakRepository
@@ -125,6 +151,11 @@ public class AgentBreakService {
                 )
                 .orElse(null);
     }
+
+
+    // ============================================================
+    // NORMAL BREAK TOTAL
+    // ============================================================
 
     public long getNormalBreakTotalSeconds(
             Long agentId,
@@ -138,11 +169,18 @@ public class AgentBreakService {
                         );
 
         return breaks.stream()
-                .filter(b -> b.getBreakType()
-                        == AgentBreak.BreakType.NORMAL)
+                .filter(b ->
+                        b.getBreakType()
+                                == AgentBreak.BreakType.NORMAL
+                )
                 .mapToLong(this::getEffectiveDuration)
                 .sum();
     }
+
+
+    // ============================================================
+    // EXCEPTION BREAK TOTAL
+    // ============================================================
 
     public long getExceptionBreakTotalSeconds(
             Long agentId,
@@ -156,19 +194,28 @@ public class AgentBreakService {
                         );
 
         return breaks.stream()
-                .filter(b -> b.getBreakType()
-                        == AgentBreak.BreakType.EXCEPTION)
+                .filter(b ->
+                        b.getBreakType()
+                                == AgentBreak.BreakType.EXCEPTION
+                )
                 .mapToLong(this::getEffectiveDuration)
                 .sum();
     }
 
-    private long getEffectiveDuration(AgentBreak agentBreak) {
+
+    // ============================================================
+    // EFFECTIVE BREAK DURATION
+    // ============================================================
+
+    private long getEffectiveDuration(
+            AgentBreak agentBreak) {
 
         if (agentBreak.getDurationSeconds() != null) {
             return agentBreak.getDurationSeconds();
         }
 
         if (agentBreak.getEndTime() == null) {
+
             return Duration.between(
                     agentBreak.getStartTime(),
                     LocalDateTime.now()
@@ -178,6 +225,11 @@ public class AgentBreakService {
         return 0;
     }
 
+
+    // ============================================================
+    // CHECK NORMAL BREAK LIMIT
+    // ============================================================
+
     public boolean isNormalBreakOverLimit(
             Long agentId,
             Long attendanceId) {
@@ -186,5 +238,140 @@ public class AgentBreakService {
                 agentId,
                 attendanceId
         ) > NORMAL_BREAK_LIMIT_SECONDS;
+    }
+
+
+    // ============================================================
+    // BREAK SUMMARY
+    // ============================================================
+
+    public BreakSummary getBreakSummary(
+            Long agentId) {
+
+        AgentAttendance attendance =
+                attendanceRepository
+                        .findByAgentIdAndAttendanceDate(
+                                agentId,
+                                LocalDate.now()
+                        )
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "No attendance record found for today."
+                                )
+                        );
+
+        long normalUsedSeconds =
+                getNormalBreakTotalSeconds(
+                        agentId,
+                        attendance.getId()
+                );
+
+        long exceptionUsedSeconds =
+                getExceptionBreakTotalSeconds(
+                        agentId,
+                        attendance.getId()
+                );
+
+        AgentBreak activeBreak =
+                getActiveBreak(agentId);
+
+        long normalRemainingSeconds =
+                Math.max(
+                        0,
+                        NORMAL_BREAK_LIMIT_SECONDS
+                                - normalUsedSeconds
+                );
+
+        String activeBreakStartTime = null;
+
+        String activeBreakType = null;
+
+        if (activeBreak != null) {
+
+            activeBreakStartTime =
+                    activeBreak
+                            .getStartTime()
+                            .toString();
+
+            activeBreakType =
+                    activeBreak
+                            .getBreakType()
+                            .name();
+        }
+
+        return new BreakSummary(
+                normalUsedSeconds,
+                normalRemainingSeconds,
+                exceptionUsedSeconds,
+                activeBreakStartTime,
+                activeBreakType
+        );
+    }
+
+
+    // ============================================================
+    // BREAK SUMMARY RESPONSE
+    // ============================================================
+
+    public static class BreakSummary {
+
+        private final long normalUsedSeconds;
+
+        private final long normalRemainingSeconds;
+
+        private final long exceptionUsedSeconds;
+
+        private final String activeBreakStartTime;
+
+        private final String activeBreakType;
+
+
+        public BreakSummary(
+                long normalUsedSeconds,
+                long normalRemainingSeconds,
+                long exceptionUsedSeconds,
+                String activeBreakStartTime,
+                String activeBreakType) {
+
+            this.normalUsedSeconds =
+                    normalUsedSeconds;
+
+            this.normalRemainingSeconds =
+                    normalRemainingSeconds;
+
+            this.exceptionUsedSeconds =
+                    exceptionUsedSeconds;
+
+            this.activeBreakStartTime =
+                    activeBreakStartTime;
+
+            this.activeBreakType =
+                    activeBreakType;
+        }
+
+
+        public long getNormalUsedSeconds() {
+            return normalUsedSeconds;
+        }
+
+
+        public long getNormalRemainingSeconds() {
+            return normalRemainingSeconds;
+        }
+
+
+        public long getExceptionUsedSeconds() {
+            return exceptionUsedSeconds;
+        }
+
+
+        public String getActiveBreakStartTime() {
+            return activeBreakStartTime;
+        }
+
+
+        public String getActiveBreakType() {
+            return activeBreakType;
+        }
     }
 }

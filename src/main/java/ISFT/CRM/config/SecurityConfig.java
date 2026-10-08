@@ -151,6 +151,17 @@ public class SecurityConfig {
                                 "AGENT"
                         )
 
+                                // ==================================================
+                                // ATTENDANCE / BREAKS
+                                // ==================================================
+
+                                .requestMatchers("/api/attendance/**")
+                                .hasAnyRole(
+                                        "ADMIN",
+                                        "MANAGER",
+                                        "AGENT"
+                                )
+
 
                         // ==================================================
                         // LEADS - DELETE

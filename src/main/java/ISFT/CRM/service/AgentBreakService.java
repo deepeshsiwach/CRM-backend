@@ -286,29 +286,48 @@ public class AgentBreakService {
 
         String activeBreakType = null;
 
+        long activeBreakElapsedSeconds = 0;
+
+
+        // ========================================================
+        // SERVER-SIDE ACTIVE BREAK TIMER
+        // ========================================================
+
         if (activeBreak != null) {
 
             activeBreakStartTime =
                     activeBreak
                             .getStartTime()
-                            .atOffset(
-                                    java.time.ZoneOffset.UTC
-                            )
-                            .toInstant()
                             .toString();
 
             activeBreakType =
                     activeBreak
                             .getBreakType()
                             .name();
+
+            /*
+             * Calculate elapsed time on the SERVER.
+             *
+             * This avoids browser timezone problems.
+             */
+            activeBreakElapsedSeconds =
+                    Math.max(
+                            0,
+                            Duration.between(
+                                    activeBreak.getStartTime(),
+                                    LocalDateTime.now()
+                            ).getSeconds()
+                    );
         }
+
 
         return new BreakSummary(
                 normalUsedSeconds,
                 normalRemainingSeconds,
                 exceptionUsedSeconds,
                 activeBreakStartTime,
-                activeBreakType
+                activeBreakType,
+                activeBreakElapsedSeconds
         );
     }
 
@@ -329,13 +348,16 @@ public class AgentBreakService {
 
         private final String activeBreakType;
 
+        private final long activeBreakElapsedSeconds;
+
 
         public BreakSummary(
                 long normalUsedSeconds,
                 long normalRemainingSeconds,
                 long exceptionUsedSeconds,
                 String activeBreakStartTime,
-                String activeBreakType) {
+                String activeBreakType,
+                long activeBreakElapsedSeconds) {
 
             this.normalUsedSeconds =
                     normalUsedSeconds;
@@ -351,6 +373,9 @@ public class AgentBreakService {
 
             this.activeBreakType =
                     activeBreakType;
+
+            this.activeBreakElapsedSeconds =
+                    activeBreakElapsedSeconds;
         }
 
 
@@ -376,6 +401,11 @@ public class AgentBreakService {
 
         public String getActiveBreakType() {
             return activeBreakType;
+        }
+
+
+        public long getActiveBreakElapsedSeconds() {
+            return activeBreakElapsedSeconds;
         }
     }
 }

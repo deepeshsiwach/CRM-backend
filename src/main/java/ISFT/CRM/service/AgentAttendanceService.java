@@ -10,9 +10,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.time.ZoneId;
 
 @Service
 public class AgentAttendanceService {
+
+    private static final ZoneId INDIA_ZONE = ZoneId.of("Asia/Kolkata");
 
     private final AgentAttendanceRepository attendanceRepository;
 

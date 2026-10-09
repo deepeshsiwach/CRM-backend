@@ -45,8 +45,14 @@ public class AgentAttendanceService {
 
             AgentAttendance attendance = existingAttendance.get();
 
-            // Preserve the original first login time for today.
-            // Do not overwrite loginTime or reset the previous logoutTime.
+            // Preserve the first login time of the day.
+            // Clear the previous logout time when the agent logs in again.
+            if (attendance.getLogoutTime() != null) {
+                attendance.setLogoutTime(null);
+                return attendanceRepository.save(attendance);
+            }
+
+            // Already logged in: keep the existing record.
             return attendance;
         }
 

@@ -125,7 +125,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/dashboard/**")
                         .hasAnyRole(
                                 "ADMIN",
-                                "MANAGER"
+                                "MANAGER",
+                                "AGENT"
                         )
 
 
@@ -151,16 +152,16 @@ public class SecurityConfig {
                                 "AGENT"
                         )
 
-                                // ==================================================
-                                // ATTENDANCE / BREAKS
-                                // ==================================================
+                        // ==================================================
+                        // ATTENDANCE / BREAKS
+                        // ==================================================
 
-                                .requestMatchers("/api/attendance/**")
-                                .hasAnyRole(
-                                        "ADMIN",
-                                        "MANAGER",
-                                        "AGENT"
-                                )
+                        .requestMatchers("/api/attendance/**")
+                        .hasAnyRole(
+                                "ADMIN",
+                                "MANAGER",
+                                "AGENT"
+                        )
 
 
                         // ==================================================
@@ -220,17 +221,17 @@ public class SecurityConfig {
                         )
 
 
-                                // ==================================================
-                                //  OTHER LEAD ASSIGNMENT OPERATIONS
-                                // ADMIN + MANAGER + AGENT
-                                // ==================================================
+                        // ==================================================
+                        //  OTHER LEAD ASSIGNMENT OPERATIONS
+                        // ADMIN + MANAGER + AGENT
+                        // ==================================================
 
-                                .requestMatchers("/api/lead-assignments/**")
-                                .hasAnyRole(
-                                        "ADMIN",
-                                        "MANAGER",
-                                        "AGENT"
-                                )
+                        .requestMatchers("/api/lead-assignments/**")
+                        .hasAnyRole(
+                                "ADMIN",
+                                "MANAGER",
+                                "AGENT"
+                        )
 
                         // ==================================================
                         // CALL LOGS
@@ -271,6 +272,18 @@ public class SecurityConfig {
                         // ==================================================
                         // COURSES
                         // ==================================================
+
+                        // Agents may view courses, but only ADMIN/MANAGER
+                        // may create, update, or delete courses.
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/courses/**"
+                        )
+                        .hasAnyRole(
+                                "ADMIN",
+                                "MANAGER",
+                                "AGENT"
+                        )
 
                         .requestMatchers("/api/courses/**")
                         .hasAnyRole(

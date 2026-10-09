@@ -10,12 +10,16 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
 public class AgentBreakService {
 
     private static final long NORMAL_BREAK_LIMIT_SECONDS = 3600;
+
+    private static final ZoneId INDIA_ZONE =
+            ZoneId.of("Asia/Kolkata");
 
     private final AgentBreakRepository breakRepository;
     private final AgentAttendanceRepository attendanceRepository;
@@ -56,7 +60,7 @@ public class AgentBreakService {
                 attendanceRepository
                         .findByAgentIdAndAttendanceDate(
                                 agentId,
-                                LocalDate.now()
+                                LocalDate.now(INDIA_ZONE)
                         )
                         .orElseThrow(() ->
                                 new IllegalStateException(
@@ -90,7 +94,7 @@ public class AgentBreakService {
         agentBreak.setAgentId(agentId);
         agentBreak.setAttendanceId(attendance.getId());
         agentBreak.setBreakType(breakType);
-        agentBreak.setStartTime(LocalDateTime.now());
+        agentBreak.setStartTime(LocalDateTime.now(INDIA_ZONE));
 
         agentBreak.setReason(
                 reason == null
@@ -124,7 +128,7 @@ public class AgentBreakService {
                         );
 
         LocalDateTime endTime =
-                LocalDateTime.now();
+                LocalDateTime.now(INDIA_ZONE);
 
         long durationSeconds =
                 Duration.between(
@@ -218,7 +222,7 @@ public class AgentBreakService {
 
             return Duration.between(
                     agentBreak.getStartTime(),
-                    LocalDateTime.now()
+                    LocalDateTime.now(INDIA_ZONE)
             ).getSeconds();
         }
 
@@ -252,7 +256,7 @@ public class AgentBreakService {
                 attendanceRepository
                         .findByAgentIdAndAttendanceDate(
                                 agentId,
-                                LocalDate.now()
+                                LocalDate.now(INDIA_ZONE)
                         )
                         .orElseThrow(() ->
                                 new IllegalStateException(
@@ -315,7 +319,7 @@ public class AgentBreakService {
                             0,
                             Duration.between(
                                     activeBreak.getStartTime(),
-                                    LocalDateTime.now()
+                                    LocalDateTime.now(INDIA_ZONE)
                             ).getSeconds()
                     );
         }

@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
                 )
         }
 )
+
 public class AgentAttendance {
 
     // ========================================
@@ -92,7 +93,6 @@ public class AgentAttendance {
 
         createdAt = now;
         updatedAt = now;
-
     }
 
 
@@ -104,7 +104,6 @@ public class AgentAttendance {
     protected void onUpdate() {
 
         updatedAt = LocalDateTime.now();
-
     }
 
 

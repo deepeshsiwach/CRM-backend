@@ -1,4 +1,3 @@
-
 package ISFT.CRM.controller;
 
 import ISFT.CRM.entity.AgentAttendance;
@@ -225,54 +224,36 @@ public class AgentAttendanceAdminController {
     // GROSS WORKING TIME
     // ==========================================================
 
-    private long getGrossWorkingSeconds(
-            AgentAttendance attendance) {
-
+    private long getGrossWorkingSeconds(AgentAttendance attendance) {
         if (attendance.getLoginTime() == null
                 || attendance.getAttendanceDate() == null) {
             return 0;
         }
 
-        LocalDate attendanceDate =
-                attendance.getAttendanceDate();
-
-        LocalDateTime startTime =
-                attendance.getLoginTime();
-
-        LocalDateTime endOfAttendanceDay =
-                attendanceDate.plusDays(1).atStartOfDay();
-
+        LocalDate attendanceDate = attendance.getAttendanceDate();
+        LocalDateTime startTime = attendance.getLoginTime();
+        LocalDateTime endOfAttendanceDay = attendanceDate.plusDays(1).atStartOfDay();
+        LocalDate today = LocalDate.now(INDIA_ZONE);
         LocalDateTime endTime;
 
         if (attendance.getLogoutTime() != null) {
-
             endTime = attendance.getLogoutTime();
-
-        } else if (attendanceDate.equals(
-                LocalDate.now(INDIA_ZONE))) {
-
+        } else if (attendanceDate.equals(today)) {
             endTime = LocalDateTime.now(INDIA_ZONE);
-
         } else {
-
-            // Previous day's attendance must never keep
-            // counting into later days.
+            // A previous day's open attendance must stop at midnight.
             endTime = endOfAttendanceDay;
         }
 
-        // Never count outside this attendance date.
+        // Clamp to this attendance date, regardless of saved timestamps.
         if (endTime.isAfter(endOfAttendanceDay)) {
             endTime = endOfAttendanceDay;
         }
-
         if (endTime.isBefore(startTime)) {
             return 0;
         }
 
-        return Math.max(
-                0,
-                Duration.between(startTime, endTime).getSeconds()
-        );
+        return Duration.between(startTime, endTime).getSeconds();
     }
 
     // ==========================================================
@@ -283,53 +264,46 @@ public class AgentAttendanceAdminController {
             AgentBreak agentBreak,
             AgentAttendance attendance) {
 
-        if (agentBreak.getStartTime() == null
+        if (agentBreak == null
+                || agentBreak.getStartTime() == null
                 || attendance.getAttendanceDate() == null) {
             return 0;
         }
 
-        LocalDate attendanceDate =
-                attendance.getAttendanceDate();
+        LocalDate attendanceDate = attendance.getAttendanceDate();
+        LocalDateTime attendanceStart = attendance.getLoginTime() != null
+                ? attendance.getLoginTime()
+                : attendanceDate.atStartOfDay();
+        LocalDateTime endOfAttendanceDay = attendanceDate.plusDays(1).atStartOfDay();
+        LocalDateTime startTime = agentBreak.getStartTime();
 
-        LocalDateTime startTime =
-                agentBreak.getStartTime();
-
-        LocalDateTime endOfAttendanceDay =
-                attendanceDate.plusDays(1).atStartOfDay();
+        // Ignore breaks that do not belong to this attendance day's interval.
+        if (startTime.isBefore(attendanceStart) || !startTime.isBefore(endOfAttendanceDay)) {
+            return 0;
+        }
 
         LocalDateTime endTime;
-
         if (agentBreak.getEndTime() != null) {
-
             endTime = agentBreak.getEndTime();
-
-        } else if (attendanceDate.equals(
-                LocalDate.now(INDIA_ZONE))) {
-
+        } else if (attendanceDate.equals(LocalDate.now(INDIA_ZONE))) {
             endTime = LocalDateTime.now(INDIA_ZONE);
-
         } else {
-
-            // A break left open on a previous date stops
-            // at the end of its attendance day.
+            // An unfinished break from a previous day stops at midnight.
             endTime = endOfAttendanceDay;
         }
 
-        // Limit the break to its attendance date.
+        // Do not count a break beyond the attendance date or logout time.
         if (endTime.isAfter(endOfAttendanceDay)) {
             endTime = endOfAttendanceDay;
         }
-
+        if (attendance.getLogoutTime() != null && endTime.isAfter(attendance.getLogoutTime())) {
+            endTime = attendance.getLogoutTime();
+        }
         if (endTime.isBefore(startTime)) {
             return 0;
         }
 
-        // Calculate from timestamps instead of relying on a
-        // stored duration that might be stale or incorrect.
-        return Math.max(
-                0,
-                Duration.between(startTime, endTime).getSeconds()
-        );
+        return Duration.between(startTime, endTime).getSeconds();
     }
 
     // ==========================================================

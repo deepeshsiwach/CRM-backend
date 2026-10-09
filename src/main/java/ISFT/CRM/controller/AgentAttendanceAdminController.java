@@ -1,3 +1,4 @@
+
 package ISFT.CRM.controller;
 
 import ISFT.CRM.entity.AgentAttendance;
@@ -9,7 +10,6 @@ import ISFT.CRM.repository.UserRepository;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -31,60 +31,39 @@ public class AgentAttendanceAdminController {
             AgentAttendanceRepository attendanceRepository,
             AgentBreakRepository breakRepository,
             UserRepository userRepository) {
-
         this.attendanceRepository = attendanceRepository;
         this.breakRepository = breakRepository;
         this.userRepository = userRepository;
     }
 
-    // ==========================================================
     // GET ALL ATTENDANCE
-    // ==========================================================
-
     @GetMapping
     public List<AttendanceRow> getAllAttendance() {
 
-        Map<Long, String> agentNames =
-                userRepository.findAll()
-                        .stream()
-                        .filter(user ->
-                                user.getRole() == User.Role.AGENT)
-                        .collect(Collectors.toMap(
-                                User::getId,
-                                User::getFullName,
-                                (first, second) -> first
-                        ));
-
-        return attendanceRepository
-                .findAll()
+        List<User> agents = userRepository.findAll()
                 .stream()
-                .sorted((a, b) -> {
-                    int dateCompare = b.getAttendanceDate()
-                            .compareTo(a.getAttendanceDate());
+                .filter(user -> user.getRole() == User.Role.AGENT)
+                .collect(Collectors.toList());
 
-                    if (dateCompare != 0) {
-                        return dateCompare;
-                    }
+        Map<Long, String> agentNames = agents.stream()
+                .collect(Collectors.toMap(
+                        User::getId,
+                        User::getFullName
+                ));
 
-                    return a.getLoginTime()
-                            .compareTo(b.getLoginTime());
-                })
-                .map(attendance ->
-                        buildAttendanceRow(
-                                attendance,
-                                agentNames.getOrDefault(
-                                        attendance.getAgentId(),
-                                        "Agent #" + attendance.getAgentId()
-                                )
+        return attendanceRepository.findAll()
+                .stream()
+                .map(attendance -> buildAttendanceRow(
+                        attendance,
+                        agentNames.getOrDefault(
+                                attendance.getAgentId(),
+                                "Agent #" + attendance.getAgentId()
                         )
-                )
+                ))
                 .collect(Collectors.toList());
     }
 
-    // ==========================================================
     // GET ATTENDANCE DETAILS
-    // ==========================================================
-
     @GetMapping("/{attendanceId}")
     public AttendanceDetails getAttendanceDetails(
             @PathVariable Long attendanceId) {
@@ -97,46 +76,37 @@ public class AgentAttendanceAdminController {
                                 )
                         );
 
-        String agentName =
-                userRepository.findById(attendance.getAgentId())
-                        .map(User::getFullName)
-                        .orElse("Agent #" + attendance.getAgentId());
+        String agentName = userRepository
+                .findById(attendance.getAgentId())
+                .map(User::getFullName)
+                .orElse("Agent #" + attendance.getAgentId());
 
-        List<AgentBreak> breaks =
-                breakRepository
-                        .findByAgentIdAndAttendanceIdOrderByStartTimeAsc(
-                                attendance.getAgentId(),
-                                attendance.getId()
-                        );
-
-        long normalBreakSeconds =
-                breaks.stream()
-                        .filter(b ->
-                                b.getBreakType()
-                                        == AgentBreak.BreakType.NORMAL)
-                        .mapToLong(b ->
-                                getEffectiveDuration(b, attendance))
-                        .sum();
-
-        long exceptionBreakSeconds =
-                breaks.stream()
-                        .filter(b ->
-                                b.getBreakType()
-                                        == AgentBreak.BreakType.EXCEPTION)
-                        .mapToLong(b ->
-                                getEffectiveDuration(b, attendance))
-                        .sum();
-
-        long grossSeconds =
-                getGrossWorkingSeconds(attendance);
-
-        long netWorkingSeconds =
-                Math.max(
-                        0,
-                        grossSeconds
-                                - normalBreakSeconds
-                                - exceptionBreakSeconds
+        List<AgentBreak> breaks = breakRepository
+                .findByAgentIdAndAttendanceIdOrderByStartTimeAsc(
+                        attendance.getAgentId(),
+                        attendance.getId()
                 );
+
+        long normalBreakSeconds = breaks.stream()
+                .filter(b -> b.getBreakType()
+                        == AgentBreak.BreakType.NORMAL)
+                .mapToLong(b -> getEffectiveDuration(b, attendance))
+                .sum();
+
+        long exceptionBreakSeconds = breaks.stream()
+                .filter(b -> b.getBreakType()
+                        == AgentBreak.BreakType.EXCEPTION)
+                .mapToLong(b -> getEffectiveDuration(b, attendance))
+                .sum();
+
+        long grossSeconds = getGrossWorkingSeconds(attendance);
+
+        long netWorkingSeconds = Math.max(
+                0,
+                grossSeconds
+                        - normalBreakSeconds
+                        - exceptionBreakSeconds
+        );
 
         return new AttendanceDetails(
                 attendance.getId(),
@@ -144,11 +114,9 @@ public class AgentAttendanceAdminController {
                 agentName,
                 attendance.getAttendanceDate().toString(),
                 attendance.getLoginTime() == null
-                        ? null
-                        : attendance.getLoginTime().toString(),
+                        ? null : attendance.getLoginTime().toString(),
                 attendance.getLogoutTime() == null
-                        ? null
-                        : attendance.getLogoutTime().toString(),
+                        ? null : attendance.getLogoutTime().toString(),
                 grossSeconds,
                 netWorkingSeconds,
                 normalBreakSeconds,
@@ -159,49 +127,37 @@ public class AgentAttendanceAdminController {
         );
     }
 
-    // ==========================================================
     // BUILD ATTENDANCE ROW
-    // ==========================================================
-
     private AttendanceRow buildAttendanceRow(
             AgentAttendance attendance,
             String agentName) {
 
-        List<AgentBreak> breaks =
-                breakRepository
-                        .findByAgentIdAndAttendanceIdOrderByStartTimeAsc(
-                                attendance.getAgentId(),
-                                attendance.getId()
-                        );
-
-        long normalBreakSeconds =
-                breaks.stream()
-                        .filter(b ->
-                                b.getBreakType()
-                                        == AgentBreak.BreakType.NORMAL)
-                        .mapToLong(b ->
-                                getEffectiveDuration(b, attendance))
-                        .sum();
-
-        long exceptionBreakSeconds =
-                breaks.stream()
-                        .filter(b ->
-                                b.getBreakType()
-                                        == AgentBreak.BreakType.EXCEPTION)
-                        .mapToLong(b ->
-                                getEffectiveDuration(b, attendance))
-                        .sum();
-
-        long grossSeconds =
-                getGrossWorkingSeconds(attendance);
-
-        long netWorkingSeconds =
-                Math.max(
-                        0,
-                        grossSeconds
-                                - normalBreakSeconds
-                                - exceptionBreakSeconds
+        List<AgentBreak> breaks = breakRepository
+                .findByAgentIdAndAttendanceIdOrderByStartTimeAsc(
+                        attendance.getAgentId(),
+                        attendance.getId()
                 );
+
+        long normalBreakSeconds = breaks.stream()
+                .filter(b -> b.getBreakType()
+                        == AgentBreak.BreakType.NORMAL)
+                .mapToLong(b -> getEffectiveDuration(b, attendance))
+                .sum();
+
+        long exceptionBreakSeconds = breaks.stream()
+                .filter(b -> b.getBreakType()
+                        == AgentBreak.BreakType.EXCEPTION)
+                .mapToLong(b -> getEffectiveDuration(b, attendance))
+                .sum();
+
+        long grossSeconds = getGrossWorkingSeconds(attendance);
+
+        long netWorkingSeconds = Math.max(
+                0,
+                grossSeconds
+                        - normalBreakSeconds
+                        - exceptionBreakSeconds
+        );
 
         return new AttendanceRow(
                 attendance.getId(),
@@ -209,107 +165,97 @@ public class AgentAttendanceAdminController {
                 agentName,
                 attendance.getAttendanceDate().toString(),
                 attendance.getLoginTime() == null
-                        ? null
-                        : attendance.getLoginTime().toString(),
+                        ? null : attendance.getLoginTime().toString(),
                 attendance.getLogoutTime() == null
-                        ? null
-                        : attendance.getLogoutTime().toString(),
+                        ? null : attendance.getLogoutTime().toString(),
                 netWorkingSeconds,
                 normalBreakSeconds,
                 exceptionBreakSeconds
         );
     }
 
-    // ==========================================================
-    // GROSS WORKING TIME
-    // ==========================================================
+    // WORKING TIME: NEVER ACCUMULATE PAST MIDNIGHT
+    private long getGrossWorkingSeconds(
+            AgentAttendance attendance) {
 
-    private long getGrossWorkingSeconds(AgentAttendance attendance) {
         if (attendance.getLoginTime() == null
                 || attendance.getAttendanceDate() == null) {
             return 0;
         }
 
-        LocalDate attendanceDate = attendance.getAttendanceDate();
-        LocalDateTime startTime = attendance.getLoginTime();
-        LocalDateTime endOfAttendanceDay = attendanceDate.plusDays(1).atStartOfDay();
-        LocalDate today = LocalDate.now(INDIA_ZONE);
-        LocalDateTime endTime;
+        LocalDateTime start = attendance.getLoginTime();
+
+        LocalDateTime dayEnd = attendance.getAttendanceDate()
+                .plusDays(1)
+                .atStartOfDay();
+
+        LocalDateTime end;
 
         if (attendance.getLogoutTime() != null) {
-            endTime = attendance.getLogoutTime();
-        } else if (attendanceDate.equals(today)) {
-            endTime = LocalDateTime.now(INDIA_ZONE);
+            end = attendance.getLogoutTime();
         } else {
-            // A previous day's open attendance must stop at midnight.
-            endTime = endOfAttendanceDay;
+            end = LocalDateTime.now(INDIA_ZONE);
         }
 
-        // Clamp to this attendance date, regardless of saved timestamps.
-        if (endTime.isAfter(endOfAttendanceDay)) {
-            endTime = endOfAttendanceDay;
+        // Cap every record at the end of its attendance day.
+        if (end.isAfter(dayEnd)) {
+            end = dayEnd;
         }
-        if (endTime.isBefore(startTime)) {
+
+        if (!end.isAfter(start)) {
             return 0;
         }
 
-        return Duration.between(startTime, endTime).getSeconds();
+        return Duration.between(start, end).getSeconds();
     }
 
-    // ==========================================================
-    // BREAK DURATION
-    // ==========================================================
-
+    // BREAK DURATION: CAP ACTIVE BREAKS AT MIDNIGHT
     private long getEffectiveDuration(
             AgentBreak agentBreak,
             AgentAttendance attendance) {
 
-        if (agentBreak == null
-                || agentBreak.getStartTime() == null
-                || attendance.getAttendanceDate() == null) {
+        if (agentBreak.getStartTime() == null) {
             return 0;
         }
 
-        LocalDate attendanceDate = attendance.getAttendanceDate();
-        LocalDateTime attendanceStart = attendance.getLoginTime() != null
-                ? attendance.getLoginTime()
-                : attendanceDate.atStartOfDay();
-        LocalDateTime endOfAttendanceDay = attendanceDate.plusDays(1).atStartOfDay();
-        LocalDateTime startTime = agentBreak.getStartTime();
+        LocalDateTime start = agentBreak.getStartTime();
 
-        // Ignore breaks that do not belong to this attendance day's interval.
-        if (startTime.isBefore(attendanceStart) || !startTime.isBefore(endOfAttendanceDay)) {
-            return 0;
-        }
+        LocalDateTime dayEnd = attendance.getAttendanceDate()
+                .plusDays(1)
+                .atStartOfDay();
 
-        LocalDateTime endTime;
+        LocalDateTime end;
+
         if (agentBreak.getEndTime() != null) {
-            endTime = agentBreak.getEndTime();
-        } else if (attendanceDate.equals(LocalDate.now(INDIA_ZONE))) {
-            endTime = LocalDateTime.now(INDIA_ZONE);
+            end = agentBreak.getEndTime();
+
+            if (agentBreak.getDurationSeconds() != null) {
+                // Keep recorded duration, but don't allow a
+                // break to exceed the attendance day's duration.
+                long maxSeconds = Math.max(
+                        0, Duration.between(start, dayEnd).getSeconds()
+                );
+                return Math.min(
+                        Math.max(0, agentBreak.getDurationSeconds()),
+                        maxSeconds
+                );
+            }
         } else {
-            // An unfinished break from a previous day stops at midnight.
-            endTime = endOfAttendanceDay;
+            end = LocalDateTime.now(INDIA_ZONE);
         }
 
-        // Do not count a break beyond the attendance date or logout time.
-        if (endTime.isAfter(endOfAttendanceDay)) {
-            endTime = endOfAttendanceDay;
+        if (end.isAfter(dayEnd)) {
+            end = dayEnd;
         }
-        if (attendance.getLogoutTime() != null && endTime.isAfter(attendance.getLogoutTime())) {
-            endTime = attendance.getLogoutTime();
-        }
-        if (endTime.isBefore(startTime)) {
+
+        if (!end.isAfter(start)) {
             return 0;
         }
 
-        return Duration.between(startTime, endTime).getSeconds();
+        return Duration.between(start, end).getSeconds();
     }
 
-    // ==========================================================
-    // BREAK ROW
-    // ==========================================================
-
+    // BREAK DTO CONVERSION
     private BreakRow toBreakRow(
             AgentBreak agentBreak,
             AgentAttendance attendance) {
@@ -317,25 +263,18 @@ public class AgentAttendanceAdminController {
         return new BreakRow(
                 agentBreak.getId(),
                 agentBreak.getBreakType() == null
-                        ? null
-                        : agentBreak.getBreakType().name(),
+                        ? null : agentBreak.getBreakType().name(),
                 agentBreak.getStartTime() == null
-                        ? null
-                        : agentBreak.getStartTime().toString(),
+                        ? null : agentBreak.getStartTime().toString(),
                 agentBreak.getEndTime() == null
-                        ? null
-                        : agentBreak.getEndTime().toString(),
+                        ? null : agentBreak.getEndTime().toString(),
                 getEffectiveDuration(agentBreak, attendance),
                 agentBreak.getReason()
         );
     }
 
-    // ==========================================================
     // ATTENDANCE ROW DTO
-    // ==========================================================
-
     public static class AttendanceRow {
-
         private final Long id;
         private final Long agentId;
         private final String agentName;
@@ -347,16 +286,10 @@ public class AgentAttendanceAdminController {
         private final long exceptionBreakSeconds;
 
         public AttendanceRow(
-                Long id,
-                Long agentId,
-                String agentName,
-                String attendanceDate,
-                String loginTime,
-                String logoutTime,
-                long workingSeconds,
-                long normalBreakSeconds,
-                long exceptionBreakSeconds) {
-
+                Long id, Long agentId, String agentName,
+                String attendanceDate, String loginTime,
+                String logoutTime, long workingSeconds,
+                long normalBreakSeconds, long exceptionBreakSeconds) {
             this.id = id;
             this.agentId = agentId;
             this.agentName = agentName;
@@ -379,12 +312,8 @@ public class AgentAttendanceAdminController {
         public long getExceptionBreakSeconds() { return exceptionBreakSeconds; }
     }
 
-    // ==========================================================
     // ATTENDANCE DETAILS DTO
-    // ==========================================================
-
     public static class AttendanceDetails {
-
         private final Long id;
         private final Long agentId;
         private final String agentName;
@@ -398,18 +327,11 @@ public class AgentAttendanceAdminController {
         private final List<BreakRow> breaks;
 
         public AttendanceDetails(
-                Long id,
-                Long agentId,
-                String agentName,
-                String attendanceDate,
-                String loginTime,
-                String logoutTime,
-                long grossWorkingSeconds,
-                long workingSeconds,
-                long normalBreakSeconds,
-                long exceptionBreakSeconds,
-                List<BreakRow> breaks) {
-
+                Long id, Long agentId, String agentName,
+                String attendanceDate, String loginTime,
+                String logoutTime, long grossWorkingSeconds,
+                long workingSeconds, long normalBreakSeconds,
+                long exceptionBreakSeconds, List<BreakRow> breaks) {
             this.id = id;
             this.agentId = agentId;
             this.agentName = agentName;
@@ -436,12 +358,8 @@ public class AgentAttendanceAdminController {
         public List<BreakRow> getBreaks() { return breaks; }
     }
 
-    // ==========================================================
     // BREAK DTO
-    // ==========================================================
-
     public static class BreakRow {
-
         private final Long id;
         private final String breakType;
         private final String startTime;
@@ -450,13 +368,8 @@ public class AgentAttendanceAdminController {
         private final String reason;
 
         public BreakRow(
-                Long id,
-                String breakType,
-                String startTime,
-                String endTime,
-                long durationSeconds,
-                String reason) {
-
+                Long id, String breakType, String startTime,
+                String endTime, long durationSeconds, String reason) {
             this.id = id;
             this.breakType = breakType;
             this.startTime = startTime;

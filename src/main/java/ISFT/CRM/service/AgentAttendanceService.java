@@ -8,14 +8,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
-import java.time.ZoneId;
 
 @Service
 public class AgentAttendanceService {
 
-    private static final ZoneId INDIA_ZONE = ZoneId.of("Asia/Kolkata");
+    private static final ZoneId INDIA_ZONE =
+            ZoneId.of("Asia/Kolkata");
 
     private final AgentAttendanceRepository attendanceRepository;
 
@@ -31,7 +32,9 @@ public class AgentAttendanceService {
     @Transactional
     public AgentAttendance recordLogin(Long agentId) {
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(INDIA_ZONE);
+        LocalDateTime currentTime =
+                LocalDateTime.now(INDIA_ZONE);
 
         Optional<AgentAttendance> existingAttendance =
                 attendanceRepository.findByAgentIdAndAttendanceDate(
@@ -42,11 +45,13 @@ public class AgentAttendanceService {
 
             AgentAttendance attendance = existingAttendance.get();
 
+            // Prevent duplicate login records while already logged in.
             if (attendance.getLogoutTime() == null) {
                 return attendance;
             }
 
-            attendance.setLoginTime(LocalDateTime.now());
+            // Allow a new login on the same day after logging out.
+            attendance.setLoginTime(currentTime);
             attendance.setLogoutTime(null);
 
             return attendanceRepository.save(attendance);
@@ -55,7 +60,7 @@ public class AgentAttendanceService {
         AgentAttendance attendance = new AgentAttendance();
         attendance.setAgentId(agentId);
         attendance.setAttendanceDate(today);
-        attendance.setLoginTime(LocalDateTime.now());
+        attendance.setLoginTime(currentTime);
         attendance.setLogoutTime(null);
 
         return attendanceRepository.save(attendance);
@@ -68,7 +73,7 @@ public class AgentAttendanceService {
     @Transactional
     public AgentAttendance recordLogout(Long agentId) {
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(INDIA_ZONE);
 
         AgentAttendance attendance =
                 attendanceRepository.findByAgentIdAndAttendanceDate(
@@ -79,11 +84,14 @@ public class AgentAttendanceService {
                         )
                 );
 
+        // Do not overwrite an existing logout time.
         if (attendance.getLogoutTime() != null) {
             return attendance;
         }
 
-        attendance.setLogoutTime(LocalDateTime.now());
+        attendance.setLogoutTime(
+                LocalDateTime.now(INDIA_ZONE)
+        );
 
         return attendanceRepository.save(attendance);
     }
@@ -92,10 +100,13 @@ public class AgentAttendanceService {
     // GET TODAY'S ATTENDANCE
     // ========================================
 
-    public Optional<AgentAttendance> getTodayAttendance(Long agentId) {
+    public Optional<AgentAttendance> getTodayAttendance(
+            Long agentId) {
+
+        LocalDate today = LocalDate.now(INDIA_ZONE);
 
         return attendanceRepository.findByAgentIdAndAttendanceDate(
-                agentId, LocalDate.now()
+                agentId, today
         );
     }
 
@@ -113,7 +124,8 @@ public class AgentAttendanceService {
     // GET ATTENDANCE BY DATE
     // ========================================
 
-    public List<AgentAttendance> getAttendanceByDate(LocalDate date) {
+    public List<AgentAttendance> getAttendanceByDate(
+            LocalDate date) {
 
         return attendanceRepository
                 .findByAttendanceDateOrderByLoginTimeAsc(date);

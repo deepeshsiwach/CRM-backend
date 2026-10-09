@@ -1,3 +1,4 @@
+
 package ISFT.CRM.service;
 
 import ISFT.CRM.entity.AgentAttendance;
@@ -7,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -16,10 +18,8 @@ public class AgentAttendanceService {
 
     public AgentAttendanceService(
             AgentAttendanceRepository attendanceRepository) {
-
         this.attendanceRepository = attendanceRepository;
     }
-
 
     // ========================================
     // RECORD AGENT LOGIN
@@ -31,60 +31,32 @@ public class AgentAttendanceService {
         LocalDate today = LocalDate.now();
 
         Optional<AgentAttendance> existingAttendance =
-                attendanceRepository
-                        .findByAgentIdAndAttendanceDate(
-                                agentId,
-                                today
-                        );
-
-        // ------------------------------------
-        // If today's record already exists
-        // ------------------------------------
+                attendanceRepository.findByAgentIdAndAttendanceDate(
+                        agentId, today
+                );
 
         if (existingAttendance.isPresent()) {
 
-            AgentAttendance attendance =
-                    existingAttendance.get();
+            AgentAttendance attendance = existingAttendance.get();
 
-            // If the agent is already logged in,
-            // do not create another record.
             if (attendance.getLogoutTime() == null) {
                 return attendance;
             }
 
-            // If there was an earlier login/logout
-            // today, start a new login session by
-            // updating the login time.
-            attendance.setLoginTime(
-                    LocalDateTime.now()
-            );
-
+            attendance.setLoginTime(LocalDateTime.now());
             attendance.setLogoutTime(null);
 
             return attendanceRepository.save(attendance);
         }
 
-
-        // ------------------------------------
-        // Create today's attendance record
-        // ------------------------------------
-
-        AgentAttendance attendance =
-                new AgentAttendance();
-
+        AgentAttendance attendance = new AgentAttendance();
         attendance.setAgentId(agentId);
-
         attendance.setAttendanceDate(today);
-
-        attendance.setLoginTime(
-                LocalDateTime.now()
-        );
-
+        attendance.setLoginTime(LocalDateTime.now());
         attendance.setLogoutTime(null);
 
         return attendanceRepository.save(attendance);
     }
-
 
     // ========================================
     // RECORD AGENT LOGOUT
@@ -95,62 +67,52 @@ public class AgentAttendanceService {
 
         LocalDate today = LocalDate.now();
 
-        Optional<AgentAttendance> existingAttendance =
-                attendanceRepository
-                        .findByAgentIdAndAttendanceDate(
-                                agentId,
-                                today
-                        );
-
-        // ------------------------------------
-        // No attendance record found
-        // ------------------------------------
-
-        if (existingAttendance.isEmpty()) {
-
-            throw new IllegalStateException(
-                    "No attendance record found for today."
-            );
-        }
-
-
         AgentAttendance attendance =
-                existingAttendance.get();
-
-
-        // ------------------------------------
-        // Already logged out
-        // ------------------------------------
+                attendanceRepository.findByAgentIdAndAttendanceDate(
+                        agentId, today
+                ).orElseThrow(() ->
+                        new IllegalStateException(
+                                "No attendance record found for today."
+                        )
+                );
 
         if (attendance.getLogoutTime() != null) {
-
             return attendance;
         }
 
-
-        // ------------------------------------
-        // Record logout time
-        // ------------------------------------
-
-        attendance.setLogoutTime(
-                LocalDateTime.now()
-        );
+        attendance.setLogoutTime(LocalDateTime.now());
 
         return attendanceRepository.save(attendance);
     }
-
 
     // ========================================
     // GET TODAY'S ATTENDANCE
     // ========================================
 
-    public Optional<AgentAttendance> getTodayAttendance(
-            Long agentId) {
+    public Optional<AgentAttendance> getTodayAttendance(Long agentId) {
+
+        return attendanceRepository.findByAgentIdAndAttendanceDate(
+                agentId, LocalDate.now()
+        );
+    }
+
+    // ========================================
+    // GET ALL ATTENDANCE FOR ADMIN
+    // ========================================
+
+    public List<AgentAttendance> getAllAttendance() {
 
         return attendanceRepository
-                .findByAgentIdAndAttendanceDate(
-                        agentId,
-                        LocalDate.now()
-                );
+                .findAllByOrderByAttendanceDateDescLoginTimeAsc();
+    }
+
+    // ========================================
+    // GET ATTENDANCE BY DATE
+    // ========================================
+
+    public List<AgentAttendance> getAttendanceByDate(LocalDate date) {
+
+        return attendanceRepository
+                .findByAttendanceDateOrderByLoginTimeAsc(date);
     }
 }

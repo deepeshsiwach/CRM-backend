@@ -25,16 +25,16 @@ public class AgentAttendanceService {
         this.attendanceRepository = attendanceRepository;
     }
 
-    // ========================================
-    // RECORD AGENT LOGIN
-    // ========================================
+// ========================================
+// RECORD AGENT LOGIN
+// ========================================
+
 
     @Transactional
     public AgentAttendance recordLogin(Long agentId) {
 
         LocalDate today = LocalDate.now(INDIA_ZONE);
-        LocalDateTime currentTime =
-                LocalDateTime.now(INDIA_ZONE);
+        LocalDateTime currentTime = LocalDateTime.now(INDIA_ZONE);
 
         Optional<AgentAttendance> existingAttendance =
                 attendanceRepository.findByAgentIdAndAttendanceDate(
@@ -45,18 +45,12 @@ public class AgentAttendanceService {
 
             AgentAttendance attendance = existingAttendance.get();
 
-            // Prevent duplicate login records while already logged in.
-            if (attendance.getLogoutTime() == null) {
-                return attendance;
-            }
-
-            // Allow a new login on the same day after logging out.
-            attendance.setLoginTime(currentTime);
-            attendance.setLogoutTime(null);
-
-            return attendanceRepository.save(attendance);
+            // Preserve the original first login time for today.
+            // Do not overwrite loginTime or reset the previous logoutTime.
+            return attendance;
         }
 
+        // No record exists for today, so save the first login.
         AgentAttendance attendance = new AgentAttendance();
         attendance.setAgentId(agentId);
         attendance.setAttendanceDate(today);
@@ -65,6 +59,7 @@ public class AgentAttendanceService {
 
         return attendanceRepository.save(attendance);
     }
+
 
     // ========================================
     // RECORD AGENT LOGOUT

@@ -428,32 +428,68 @@ public class DashboardController {
         }
         summary.put("leadStatusCounts", statusCounts);
 
+
         if (isAgent) {
             String email = authentication.getName();
-            Long currentAgentId = userRepository.findByEmail(email).map(User::getId).orElse(null);
+
+            Long currentAgentId = userRepository.findByEmail(email)
+                    .map(User::getId)
+                    .orElse(null);
+
             List<CallLog> agentCalls = currentAgentId != null
                     ? callLogRepository.findByAgentId(currentAgentId)
                     : Collections.emptyList();
+
             summary.put("totalCalls", agentCalls.size());
 
             Set<Long> attendedLeadIds = agentCalls.stream()
-                    .filter(c -> c.getCallStartTime() != null
-                            && c.getCallStartTime().toLocalDate().isEqual(today))
+                    .filter(call -> call.getCallStartTime() != null
+                            && call.getCallStartTime().toLocalDate().isEqual(today))
                     .map(CallLog::getLeadId)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
 
-            long attendedLeads = activeAssignments.stream()
+            Set<Long> activeLeadIds = activeAssignments.stream()
                     .map(LeadAssignment::getLeadId)
-                    .filter(id -> id != null && attendedLeadIds.contains(id))
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            long attendedLeads = activeLeadIds.stream()
+                    .filter(attendedLeadIds::contains)
                     .count();
+
+            long remainingLeads = activeLeadIds.size() - attendedLeads;
+
             summary.put("attendedLeads", attendedLeads);
-            summary.put("remainingLeads", Math.max(0, leads.size() - attendedLeads));
+            summary.put("remainingLeads", remainingLeads);
+
         } else {
-            summary.put("totalCalls", callLogRepository.count());
-            summary.put("attendedLeads", 0);
-            summary.put("remainingLeads", 0);
+            List<CallLog> allCalls = callLogRepository.findAll();
+
+            summary.put("totalCalls", allCalls.size());
+
+            Set<Long> attendedLeadIds = allCalls.stream()
+                    .filter(call -> call.getCallStartTime() != null
+                            && call.getCallStartTime().toLocalDate().isEqual(today))
+                    .map(CallLog::getLeadId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            Set<Long> activeLeadIds = activeAssignments.stream()
+                    .map(LeadAssignment::getLeadId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            long attendedLeads = activeLeadIds.stream()
+                    .filter(attendedLeadIds::contains)
+                    .count();
+
+            long remainingLeads = activeLeadIds.size() - attendedLeads;
+
+            summary.put("attendedLeads", attendedLeads);
+            summary.put("remainingLeads", remainingLeads);
         }
+
 
         // ======================================================
         // MANAGEMENT ANALYTICS

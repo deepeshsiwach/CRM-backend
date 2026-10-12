@@ -47,10 +47,23 @@ public class AgentAttendanceService {
         if (active.isPresent()) {
             AgentAttendance attendance = active.get();
 
-            // Don't create duplicate sessions for repeated login calls.
-            return attendance;
-        }
+            // Reuse only today's active attendance session.
+            if (now.toLocalDate().equals(
+                    attendance.getAttendanceDate())) {
+                return attendance;
+            }
 
+            // Close a stale session at the end of its attendance day.
+            if (attendance.getAttendanceDate() != null) {
+                LocalDateTime dayEnd = attendance
+                        .getAttendanceDate()
+                        .plusDays(1)
+                        .atStartOfDay();
+
+                attendance.setLogoutTime(dayEnd);
+                attendanceRepository.save(attendance);
+            }
+        }
         // Create a new attendance session.
         AgentAttendance attendance = new AgentAttendance();
         attendance.setAgentId(agentId);

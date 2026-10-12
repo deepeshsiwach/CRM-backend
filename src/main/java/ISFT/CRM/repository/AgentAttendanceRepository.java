@@ -1,5 +1,5 @@
 
-        package ISFT.CRM.repository;
+package ISFT.CRM.repository;
 
 import ISFT.CRM.entity.AgentAttendance;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -22,6 +22,13 @@ public interface AgentAttendanceRepository
     Optional<AgentAttendance>
     findFirstByAgentIdAndLogoutTimeIsNullOrderByLoginTimeDesc(
             Long agentId
+    );
+
+    // Find an open attendance session for an agent on a specific date
+    Optional<AgentAttendance>
+    findFirstByAgentIdAndAttendanceDateAndLogoutTimeIsNullOrderByLoginTimeDesc(
+            Long agentId,
+            LocalDate attendanceDate
     );
 
     // Get all attendance sessions for a date

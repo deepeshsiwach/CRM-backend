@@ -5,6 +5,7 @@ import ISFT.CRM.entity.Campaign;
 import ISFT.CRM.entity.FollowUp;
 import ISFT.CRM.entity.Lead;
 import ISFT.CRM.entity.LeadAssignment;
+import ISFT.CRM.repository.LeadViewActivityRepository;
 import ISFT.CRM.entity.User;
 
 import ISFT.CRM.repository.CallLogRepository;
@@ -42,6 +43,7 @@ public class DashboardController {
     private final LeadAssignmentRepository leadAssignmentRepository;
     private final UserRepository userRepository;
     private final CallLogRepository callLogRepository;
+    private final LeadViewActivityRepository leadViewActivityRepository;
     private final CampaignRepository campaignRepository;
 
 
@@ -51,13 +53,15 @@ public class DashboardController {
             LeadAssignmentRepository leadAssignmentRepository,
             UserRepository userRepository,
             CallLogRepository callLogRepository,
-            CampaignRepository campaignRepository) {
+            CampaignRepository campaignRepository,
+            LeadViewActivityRepository leadViewActivityRepository) {
 
         this.leadRepository = leadRepository;
         this.followUpRepository = followUpRepository;
         this.leadAssignmentRepository = leadAssignmentRepository;
         this.userRepository = userRepository;
         this.callLogRepository = callLogRepository;
+        this.leadViewActivityRepository = leadViewActivityRepository;
         this.campaignRepository = campaignRepository;
     }
 

@@ -444,22 +444,27 @@ public class DashboardController {
                     ? callLogRepository.findByAgentId(currentAgentId)
                     : Collections.emptyList();
 
+            // Keep totalCalls based on call logs.
             summary.put("totalCalls", agentCalls.size());
 
-            Set<Long> attendedLeadIds = agentCalls.stream()
-                    .filter(call -> call.getCallStartTime() != null
-                            && call.getCallStartTime().toLocalDate().isEqual(today))
-                    .map(CallLog::getLeadId)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-
+            // Only distinct leads currently actively assigned to this agent count.
             Set<Long> activeLeadIds = activeAssignments.stream()
                     .map(LeadAssignment::getLeadId)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
 
+            // A lead is attended when this agent opened its details today.
+            Set<Long> viewedLeadIds = currentAgentId != null
+                    ? leadViewActivityRepository
+                    .findByAgentIdAndViewedDate(currentAgentId, today)
+                    .stream()
+                    .map(activity -> activity.getLeadId())
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet())
+                    : Collections.emptySet();
+
             long attendedLeads = activeLeadIds.stream()
-                    .filter(attendedLeadIds::contains)
+                    .filter(viewedLeadIds::contains)
                     .count();
 
             long remainingLeads = activeLeadIds.size() - attendedLeads;
@@ -493,7 +498,6 @@ public class DashboardController {
             summary.put("attendedLeads", attendedLeads);
             summary.put("remainingLeads", remainingLeads);
         }
-
 
         // ======================================================
         // MANAGEMENT ANALYTICS

@@ -6,18 +6,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(
-        name = "agent_attendance",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_agent_attendance_date",
-                        columnNames = {
-                                "agent_id",
-                                "attendance_date"
-                        }
-                )
-        }
-)
+@Table(name = "agent_attendance")
 
 public class AgentAttendance {
 

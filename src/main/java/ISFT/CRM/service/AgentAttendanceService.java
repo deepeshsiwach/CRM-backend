@@ -1,5 +1,5 @@
 
-package ISFT.CRM.service;
+        package ISFT.CRM.service;
 
 import ISFT.CRM.entity.AgentAttendance;
 import ISFT.CRM.repository.AgentAttendanceRepository;
@@ -30,38 +30,32 @@ public class AgentAttendanceService {
     public AgentAttendance recordLogin(Long agentId) {
 
         if (agentId == null) {
-            throw new IllegalArgumentException("Agent ID is required.");
+            throw new IllegalArgumentException(
+                    "Agent ID is required."
+            );
         }
 
-        LocalDate today = LocalDate.now(INDIA_ZONE);
-        LocalDateTime currentTime = LocalDateTime.now(INDIA_ZONE);
+        LocalDateTime now = LocalDateTime.now(INDIA_ZONE);
 
-        Optional<AgentAttendance> existing =
-                attendanceRepository.findByAgentIdAndAttendanceDate(
-                        agentId, today
-                );
+        // If the agent already has an open session, reuse it.
+        Optional<AgentAttendance> active =
+                attendanceRepository
+                        .findFirstByAgentIdAndLogoutTimeIsNullOrderByLoginTimeDesc(
+                                agentId
+                        );
 
-        if (existing.isPresent()) {
-            AgentAttendance attendance = existing.get();
+        if (active.isPresent()) {
+            AgentAttendance attendance = active.get();
 
-            /*
-             * Do not overwrite the first login of the day.
-             * If already logged out, clear logout time to mark
-             * the agent as logged in again.
-             */
-            if (attendance.getLogoutTime() != null) {
-                attendance.setLogoutTime(null);
-                return attendanceRepository.save(attendance);
-            }
-
-            // Already logged in: do not create another record.
+            // Don't create duplicate sessions for repeated login calls.
             return attendance;
         }
 
+        // Create a new attendance session.
         AgentAttendance attendance = new AgentAttendance();
         attendance.setAgentId(agentId);
-        attendance.setAttendanceDate(today);
-        attendance.setLoginTime(currentTime);
+        attendance.setAttendanceDate(now.toLocalDate());
+        attendance.setLoginTime(now);
         attendance.setLogoutTime(null);
 
         return attendanceRepository.save(attendance);
@@ -72,58 +66,66 @@ public class AgentAttendanceService {
     public AgentAttendance recordLogout(Long agentId) {
 
         if (agentId == null) {
-            throw new IllegalArgumentException("Agent ID is required.");
+            throw new IllegalArgumentException(
+                    "Agent ID is required."
+            );
         }
-
-        LocalDate today = LocalDate.now(INDIA_ZONE);
 
         AgentAttendance attendance =
-                attendanceRepository.findByAgentIdAndAttendanceDate(
-                        agentId, today
-                ).orElseThrow(() ->
-                        new IllegalStateException(
-                                "No attendance record found for today."
+                attendanceRepository
+                        .findFirstByAgentIdAndLogoutTimeIsNullOrderByLoginTimeDesc(
+                                agentId
                         )
-                );
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "No active attendance session found."
+                                )
+                        );
 
-        // Repeated logout requests must not change the saved time.
-        if (attendance.getLogoutTime() != null) {
-            return attendance;
-        }
-
-        attendance.setLogoutTime(LocalDateTime.now(INDIA_ZONE));
+        attendance.setLogoutTime(
+                LocalDateTime.now(INDIA_ZONE)
+        );
 
         return attendanceRepository.save(attendance);
     }
 
-    // GET TODAY'S ATTENDANCE
+    // GET TODAY'S LATEST ATTENDANCE SESSION
     @Transactional(readOnly = true)
-    public Optional<AgentAttendance> getTodayAttendance(Long agentId) {
+    public Optional<AgentAttendance> getTodayAttendance(
+            Long agentId) {
 
         if (agentId == null) {
-            throw new IllegalArgumentException("Agent ID is required.");
+            throw new IllegalArgumentException(
+                    "Agent ID is required."
+            );
         }
 
         LocalDate today = LocalDate.now(INDIA_ZONE);
 
-        return attendanceRepository.findByAgentIdAndAttendanceDate(
-                agentId, today
-        );
+        return attendanceRepository
+                .findFirstByAgentIdAndAttendanceDateOrderByLoginTimeDesc(
+                        agentId,
+                        today
+                );
     }
 
     // GET ALL ATTENDANCE FOR ADMIN
     @Transactional(readOnly = true)
     public List<AgentAttendance> getAllAttendance() {
+
         return attendanceRepository
                 .findAllByOrderByAttendanceDateDescLoginTimeAsc();
     }
 
     // GET ATTENDANCE BY DATE
     @Transactional(readOnly = true)
-    public List<AgentAttendance> getAttendanceByDate(LocalDate date) {
+    public List<AgentAttendance> getAttendanceByDate(
+            LocalDate date) {
 
         if (date == null) {
-            throw new IllegalArgumentException("Attendance date is required.");
+            throw new IllegalArgumentException(
+                    "Attendance date is required."
+            );
         }
 
         return attendanceRepository

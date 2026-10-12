@@ -190,11 +190,7 @@ public class AgentAttendanceAdminController {
         );
     }
 
-    /*
-     * WORKING TIME
-     * A record can never accumulate working time past midnight
-     * on its attendance date.
-     */
+    // WORKING TIME
     private long getGrossWorkingSeconds(
             AgentAttendance attendance) {
 
@@ -204,30 +200,37 @@ public class AgentAttendanceAdminController {
         }
 
         LocalDate attendanceDate = attendance.getAttendanceDate();
-        LocalDateTime start = attendance.getLoginTime();
+        LocalDate today = LocalDate.now(INDIA_ZONE);
 
         LocalDateTime dayStart = attendanceDate.atStartOfDay();
-        LocalDateTime dayEnd = attendanceDate
-                .plusDays(1)
-                .atStartOfDay();
+        LocalDateTime dayEnd =
+                attendanceDate.plusDays(1).atStartOfDay();
 
-        // Do not calculate time before the attendance date.
+        LocalDateTime start = attendance.getLoginTime();
+
         if (start.isBefore(dayStart)) {
             start = dayStart;
         }
 
-        // For a logged-in agent, use the current India time.
-        // For a logged-out agent, use the recorded logout time.
-        LocalDateTime end = attendance.getLogoutTime() != null
-                ? attendance.getLogoutTime()
-                : LocalDateTime.now(INDIA_ZONE);
+        LocalDateTime end;
 
-        // Never let a record extend beyond its attendance day.
+        if (attendance.getLogoutTime() != null) {
+            end = attendance.getLogoutTime();
+        } else if (attendanceDate.isBefore(today)) {
+            // Old open records stop at the end of their attendance day.
+            end = dayEnd;
+        } else if (attendanceDate.isAfter(today)) {
+            return 0;
+        } else {
+            end = LocalDateTime.now(INDIA_ZONE);
+        }
+
+        // Do not count time outside this attendance date.
         if (end.isAfter(dayEnd)) {
             end = dayEnd;
         }
 
-        // Do not calculate time before login or after logout.
+        // Invalid logout times must not produce negative time.
         if (!end.isAfter(start)) {
             return 0;
         }
@@ -235,10 +238,7 @@ public class AgentAttendanceAdminController {
         return Duration.between(start, end).getSeconds();
     }
 
-    /*
-     * BREAK TIME
-     * Active breaks stop accumulating at midnight too.
-     */
+    // BREAK TIME
     private long getEffectiveDuration(
             AgentBreak agentBreak,
             AgentAttendance attendance) {
@@ -248,19 +248,34 @@ public class AgentAttendanceAdminController {
             return 0;
         }
 
+        LocalDateTime dayStart =
+                attendance.getAttendanceDate().atStartOfDay();
+
+        LocalDateTime dayEnd =
+                attendance.getAttendanceDate()
+                        .plusDays(1)
+                        .atStartOfDay();
+
         LocalDateTime start = agentBreak.getStartTime();
 
-        LocalDateTime dayEnd = attendance.getAttendanceDate()
-                .plusDays(1)
-                .atStartOfDay();
+        if (start.isBefore(dayStart)) {
+            start = dayStart;
+        }
 
         if (!start.isBefore(dayEnd)) {
             return 0;
         }
 
-        LocalDateTime end = agentBreak.getEndTime() != null
-                ? agentBreak.getEndTime()
-                : LocalDateTime.now(INDIA_ZONE);
+        LocalDateTime end;
+
+        if (agentBreak.getEndTime() != null) {
+            end = agentBreak.getEndTime();
+        } else if (attendance.getAttendanceDate()
+                .isBefore(LocalDate.now(INDIA_ZONE))) {
+            end = dayEnd;
+        } else {
+            end = LocalDateTime.now(INDIA_ZONE);
+        }
 
         if (end.isAfter(dayEnd)) {
             end = dayEnd;
@@ -273,11 +288,8 @@ public class AgentAttendanceAdminController {
         long calculatedSeconds =
                 Duration.between(start, end).getSeconds();
 
-        // If a break has already ended, respect its recorded
-        // duration, but never allow it beyond the attendance day.
         if (agentBreak.getEndTime() != null
                 && agentBreak.getDurationSeconds() != null) {
-
             return Math.min(
                     Math.max(0, agentBreak.getDurationSeconds()),
                     calculatedSeconds
@@ -304,7 +316,9 @@ public class AgentAttendanceAdminController {
         );
     }
 
+    // ATTENDANCE ROW DTO
     public static class AttendanceRow {
+
         private final Long id;
         private final Long agentId;
         private final String agentName;
@@ -350,7 +364,9 @@ public class AgentAttendanceAdminController {
         }
     }
 
+    // ATTENDANCE DETAILS DTO
     public static class AttendanceDetails {
+
         private final Long id;
         private final Long agentId;
         private final String agentName;
@@ -408,7 +424,9 @@ public class AgentAttendanceAdminController {
         public List<BreakRow> getBreaks() { return breaks; }
     }
 
+    // BREAK DTO
     public static class BreakRow {
+
         private final Long id;
         private final String breakType;
         private final String startTime;

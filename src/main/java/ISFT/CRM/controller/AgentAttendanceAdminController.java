@@ -18,6 +18,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
 @RestController
 @RequestMapping("/api/admin/attendance")
 public class AgentAttendanceAdminController {
@@ -456,5 +460,39 @@ public class AgentAttendanceAdminController {
         public String getEndTime() { return endTime; }
         public long getDurationSeconds() { return durationSeconds; }
         public String getReason() { return reason; }
+    }
+
+    // DELETE ATTENDANCE RECORD (ADMIN)
+    @DeleteMapping("/{attendanceId}")
+    @Transactional
+    public Map<String, String> deleteAttendance(
+            @PathVariable Long attendanceId) {
+
+        AgentAttendance attendance =
+                attendanceRepository.findById(attendanceId)
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Attendance record not found."
+                                )
+                        );
+
+        // Delete associated breaks first
+        List<AgentBreak> breaks =
+                breakRepository
+                        .findByAgentIdAndAttendanceIdOrderByStartTimeAsc(
+                                attendance.getAgentId(),
+                                attendance.getId()
+                        );
+
+        breakRepository.deleteAll(breaks);
+
+        // Delete attendance record
+        attendanceRepository.delete(attendance);
+
+        return Map.of(
+                "message",
+                "Attendance record deleted successfully."
+        );
     }
 }

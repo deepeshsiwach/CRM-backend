@@ -478,14 +478,14 @@ public class DashboardController {
             summary.put("remainingLeads", remainingLeads);
 
         } else {
+            // Admin / Manager: count distinct active leads opened by any agent today.
             List<CallLog> allCalls = callLogRepository.findAll();
-
             summary.put("totalCalls", allCalls.size());
 
-            Set<Long> attendedLeadIds = allCalls.stream()
-                    .filter(call -> call.getCallStartTime() != null
-                            && call.getCallStartTime().toLocalDate().isEqual(today))
-                    .map(CallLog::getLeadId)
+            Set<Long> attendedLeadIds = leadViewActivityRepository
+                    .findByViewedDate(today)
+                    .stream()
+                    .map(activity -> activity.getLeadId())
                     .filter(Objects::nonNull)
                     .collect(Collectors.toSet());
 

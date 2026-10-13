@@ -8,6 +8,9 @@ import ISFT.CRM.repository.AgentAttendanceRepository;
 import ISFT.CRM.repository.AgentBreakRepository;
 import ISFT.CRM.repository.UserRepository;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -17,10 +20,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/admin/attendance")
@@ -169,6 +168,34 @@ public class AgentAttendanceAdminController {
                 .mapToLong(b -> getEffectiveDuration(b, attendance))
                 .sum();
 
+        // Find the agent's currently active break.
+        LocalDate today = LocalDate.now(INDIA_ZONE);
+
+        AgentBreak activeBreak = null;
+
+        if (attendance.getAttendanceDate() != null
+                && attendance.getAttendanceDate().equals(today)
+                && attendance.getLogoutTime() == null) {
+
+            activeBreak = breaks.stream()
+                    .filter(b -> b.getEndTime() == null)
+                    .filter(b -> b.getStartTime() != null)
+                    .max(Comparator.comparing(AgentBreak::getStartTime))
+                    .orElse(null);
+        }
+
+        boolean onBreak = activeBreak != null;
+
+        String activeBreakType =
+                onBreak && activeBreak.getBreakType() != null
+                        ? activeBreak.getBreakType().name()
+                        : null;
+
+        String activeBreakStartTime =
+                onBreak && activeBreak.getStartTime() != null
+                        ? activeBreak.getStartTime().toString()
+                        : null;
+
         long grossSeconds = getGrossWorkingSeconds(attendance);
 
         long netWorkingSeconds = Math.max(
@@ -190,7 +217,10 @@ public class AgentAttendanceAdminController {
                         ? null : attendance.getLogoutTime().toString(),
                 netWorkingSeconds,
                 normalBreakSeconds,
-                exceptionBreakSeconds
+                exceptionBreakSeconds,
+                onBreak,
+                activeBreakType,
+                activeBreakStartTime
         );
     }
 
@@ -221,7 +251,6 @@ public class AgentAttendanceAdminController {
         if (attendance.getLogoutTime() != null) {
             end = attendance.getLogoutTime();
         } else if (attendanceDate.isBefore(today)) {
-            // Old open records stop at the end of their attendance day.
             end = dayEnd;
         } else if (attendanceDate.isAfter(today)) {
             return 0;
@@ -229,12 +258,10 @@ public class AgentAttendanceAdminController {
             end = LocalDateTime.now(INDIA_ZONE);
         }
 
-        // Do not count time outside this attendance date.
         if (end.isAfter(dayEnd)) {
             end = dayEnd;
         }
 
-        // Invalid logout times must not produce negative time.
         if (!end.isAfter(start)) {
             return 0;
         }
@@ -333,6 +360,11 @@ public class AgentAttendanceAdminController {
         private final long normalBreakSeconds;
         private final long exceptionBreakSeconds;
 
+        // New live-break fields
+        private final boolean onBreak;
+        private final String activeBreakType;
+        private final String activeBreakStartTime;
+
         public AttendanceRow(
                 Long id,
                 Long agentId,
@@ -342,7 +374,10 @@ public class AgentAttendanceAdminController {
                 String logoutTime,
                 long workingSeconds,
                 long normalBreakSeconds,
-                long exceptionBreakSeconds) {
+                long exceptionBreakSeconds,
+                boolean onBreak,
+                String activeBreakType,
+                String activeBreakStartTime) {
 
             this.id = id;
             this.agentId = agentId;
@@ -353,6 +388,9 @@ public class AgentAttendanceAdminController {
             this.workingSeconds = workingSeconds;
             this.normalBreakSeconds = normalBreakSeconds;
             this.exceptionBreakSeconds = exceptionBreakSeconds;
+            this.onBreak = onBreak;
+            this.activeBreakType = activeBreakType;
+            this.activeBreakStartTime = activeBreakStartTime;
         }
 
         public Long getId() { return id; }
@@ -363,8 +401,11 @@ public class AgentAttendanceAdminController {
         public String getLogoutTime() { return logoutTime; }
         public long getWorkingSeconds() { return workingSeconds; }
         public long getNormalBreakSeconds() { return normalBreakSeconds; }
-        public long getExceptionBreakSeconds() {
-            return exceptionBreakSeconds;
+        public long getExceptionBreakSeconds() { return exceptionBreakSeconds; }
+        public boolean isOnBreak() { return onBreak; }
+        public String getActiveBreakType() { return activeBreakType; }
+        public String getActiveBreakStartTime() {
+            return activeBreakStartTime;
         }
     }
 
@@ -477,7 +518,6 @@ public class AgentAttendanceAdminController {
                                 )
                         );
 
-        // Delete associated breaks first
         List<AgentBreak> breaks =
                 breakRepository
                         .findByAgentIdAndAttendanceIdOrderByStartTimeAsc(
@@ -486,8 +526,6 @@ public class AgentAttendanceAdminController {
                         );
 
         breakRepository.deleteAll(breaks);
-
-        // Delete attendance record
         attendanceRepository.delete(attendance);
 
         return Map.of(

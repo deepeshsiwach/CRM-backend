@@ -419,12 +419,17 @@ public class DashboardController {
         // ADDITIONAL DASHBOARD METRICS (SPEED OPTIMIZATION)
         // ======================================================
 
+
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Kolkata"));
+
         long todayFollowUps = followUps.stream()
-                .filter(fu -> fu.getFollowUpDate() != null
-                        && fu.getFollowUpDate().toLocalDate().isEqual(today))
+                .filter(fu -> fu.getFollowUpDate() != null)
+                .filter(fu -> fu.getFollowUpDate().toLocalDate().isEqual(today))
+                .filter(fu -> fu.getStatus() == FollowUp.FollowUpStatus.PENDING)
                 .count();
+
         summary.put("todayFollowUps", todayFollowUps);
+
 
         Map<String, Long> statusCounts = new LinkedHashMap<>();
         for (Lead.LeadStatus status : Lead.LeadStatus.values()) {

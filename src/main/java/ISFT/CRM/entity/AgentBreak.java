@@ -1,3 +1,4 @@
+
 package ISFT.CRM.entity;
 
 import jakarta.persistence.*;
@@ -10,6 +11,9 @@ public class AgentBreak {
 
     public enum BreakType {
         NORMAL,
+        LUNCH,
+        TEA,
+        BIO,
         EXCEPTION
     }
 

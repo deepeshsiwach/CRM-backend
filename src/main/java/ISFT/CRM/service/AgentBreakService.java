@@ -1,9 +1,11 @@
- package ISFT.CRM.service;
+
+package ISFT.CRM.service;
 
 import ISFT.CRM.entity.AgentAttendance;
 import ISFT.CRM.entity.AgentBreak;
 import ISFT.CRM.repository.AgentAttendanceRepository;
 import ISFT.CRM.repository.AgentBreakRepository;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,10 +18,17 @@ import java.util.List;
 @Service
 public class AgentBreakService {
 
-    private static final long NORMAL_BREAK_LIMIT_SECONDS = 3600;
-
     private static final ZoneId INDIA_ZONE =
             ZoneId.of("Asia/Kolkata");
+
+    private static final long LUNCH_LIMIT_SECONDS = 35 * 60L;
+    private static final long TEA_LIMIT_SECONDS = 30 * 60L;
+    private static final long BIO_LIMIT_SECONDS = 20 * 60L;
+
+    private static final long TOTAL_NORMAL_LIMIT_SECONDS =
+            LUNCH_LIMIT_SECONDS
+                    + TEA_LIMIT_SECONDS
+                    + BIO_LIMIT_SECONDS;
 
     private final AgentBreakRepository breakRepository;
     private final AgentAttendanceRepository attendanceRepository;
@@ -27,6 +36,7 @@ public class AgentBreakService {
     public AgentBreakService(
             AgentBreakRepository breakRepository,
             AgentAttendanceRepository attendanceRepository) {
+
         this.breakRepository = breakRepository;
         this.attendanceRepository = attendanceRepository;
     }
@@ -39,60 +49,87 @@ public class AgentBreakService {
             String reason) {
 
         if (agentId == null) {
-            throw new IllegalArgumentException("Agent ID is required.");
+            throw new IllegalArgumentException(
+                    "Agent ID is required.");
         }
 
         if (breakType == null) {
-            throw new IllegalArgumentException("Break type is required.");
+            throw new IllegalArgumentException(
+                    "Break type is required.");
         }
 
         if (breakType == AgentBreak.BreakType.EXCEPTION
                 && (reason == null || reason.trim().isEmpty())) {
+
             throw new IllegalArgumentException(
-                    "Reason is required for an exception break."
-            );
+                    "Reason is required for an exception break.");
+        }
+
+        if (breakType == AgentBreak.BreakType.NORMAL) {
+            throw new IllegalArgumentException(
+                    "Select Lunch, Tea, Bio, or Exception Break.");
         }
 
         AgentAttendance attendance =
                 attendanceRepository
                         .findFirstByAgentIdAndLogoutTimeIsNullOrderByLoginTimeDesc(
-                                agentId
-                        )
+                                agentId)
                         .orElseThrow(() ->
                                 new IllegalStateException(
-                                        "No active attendance session. Please log in first."
-                                )
-                        );
+                                        "No active attendance session. Please log in first."));
 
         AgentBreak activeBreak =
                 breakRepository
                         .findFirstByAgentIdAndEndTimeIsNullOrderByStartTimeDesc(
-                                agentId
-                        )
+                                agentId)
                         .orElse(null);
 
         if (activeBreak != null) {
 
-            // Close an orphaned break belonging to another session.
-            if (!activeBreak.getAttendanceId().equals(attendance.getId())) {
-                closeBreak(activeBreak, LocalDateTime.now(INDIA_ZONE));
+            if (!activeBreak.getAttendanceId()
+                    .equals(attendance.getId())) {
+
+                closeBreak(
+                        activeBreak,
+                        LocalDateTime.now(INDIA_ZONE));
+
+                breakRepository.save(activeBreak);
+
             } else {
                 throw new IllegalStateException(
-                        "You already have an active break."
-                );
+                        "You already have an active break.");
+            }
+        }
+
+        if (breakType != AgentBreak.BreakType.EXCEPTION) {
+
+            long usedSeconds =
+                    getBreakTypeUsedSeconds(
+                            agentId,
+                            attendance.getId(),
+                            breakType);
+
+            long limitSeconds = getLimitSeconds(breakType);
+
+            if (usedSeconds >= limitSeconds) {
+                throw new IllegalStateException(
+                        getBreakLabel(breakType)
+                                + " allowance is exhausted for today.");
             }
         }
 
         AgentBreak agentBreak = new AgentBreak();
+
         agentBreak.setAgentId(agentId);
         agentBreak.setAttendanceId(attendance.getId());
         agentBreak.setBreakType(breakType);
         agentBreak.setStartTime(LocalDateTime.now(INDIA_ZONE));
+
         agentBreak.setReason(
                 reason == null || reason.trim().isEmpty()
                         ? null
-                        : reason.trim()
-        );
+                        : reason.trim());
+
         agentBreak.setDurationSeconds(null);
         agentBreak.setLimitAlertSent(false);
 
@@ -104,45 +141,45 @@ public class AgentBreakService {
     public AgentBreak endBreak(Long agentId) {
 
         if (agentId == null) {
-            throw new IllegalArgumentException("Agent ID is required.");
+            throw new IllegalArgumentException(
+                    "Agent ID is required.");
         }
 
         AgentBreak agentBreak =
                 breakRepository
                         .findFirstByAgentIdAndEndTimeIsNullOrderByStartTimeDesc(
-                                agentId
-                        )
+                                agentId)
                         .orElseThrow(() ->
                                 new IllegalStateException(
-                                        "No active break found."
-                                )
-                        );
+                                        "No active break found."));
 
         closeBreak(agentBreak, LocalDateTime.now(INDIA_ZONE));
 
         return breakRepository.save(agentBreak);
     }
 
-    // CLOSE THE ACTIVE BREAK FOR A PARTICULAR ATTENDANCE SESSION
+    // CLOSE ACTIVE BREAK WHEN ATTENDANCE ENDS
     @Transactional
     public void closeActiveBreakForAttendance(
             Long agentId,
             Long attendanceId,
             LocalDateTime endTime) {
 
-        if (agentId == null || attendanceId == null || endTime == null) {
+        if (agentId == null
+                || attendanceId == null
+                || endTime == null) {
             return;
         }
 
         AgentBreak activeBreak =
                 breakRepository
                         .findFirstByAgentIdAndEndTimeIsNullOrderByStartTimeDesc(
-                                agentId
-                        )
+                                agentId)
                         .orElse(null);
 
         if (activeBreak != null
-                && attendanceId.equals(activeBreak.getAttendanceId())) {
+                && attendanceId.equals(
+                activeBreak.getAttendanceId())) {
 
             closeBreak(activeBreak, endTime);
             breakRepository.save(activeBreak);
@@ -162,10 +199,9 @@ public class AgentBreakService {
                 Math.max(
                         0,
                         Duration.between(
-                                agentBreak.getStartTime(),
-                                effectiveEnd
-                        ).getSeconds()
-                );
+                                        agentBreak.getStartTime(),
+                                        effectiveEnd)
+                                .getSeconds());
 
         agentBreak.setEndTime(effectiveEnd);
         agentBreak.setDurationSeconds(durationSeconds);
@@ -181,12 +217,11 @@ public class AgentBreakService {
 
         return breakRepository
                 .findFirstByAgentIdAndEndTimeIsNullOrderByStartTimeDesc(
-                        agentId
-                )
+                        agentId)
                 .orElse(null);
     }
 
-    // NORMAL BREAK TOTAL
+    // TOTAL NORMAL BREAK: LUNCH + TEA + BIO + LEGACY NORMAL
     @Transactional(readOnly = true)
     public long getNormalBreakTotalSeconds(
             Long agentId,
@@ -195,7 +230,9 @@ public class AgentBreakService {
         return getBreaks(agentId, attendanceId).stream()
                 .filter(b ->
                         b.getBreakType() == AgentBreak.BreakType.NORMAL
-                )
+                                || b.getBreakType() == AgentBreak.BreakType.LUNCH
+                                || b.getBreakType() == AgentBreak.BreakType.TEA
+                                || b.getBreakType() == AgentBreak.BreakType.BIO)
                 .mapToLong(this::getEffectiveDuration)
                 .sum();
     }
@@ -208,8 +245,27 @@ public class AgentBreakService {
 
         return getBreaks(agentId, attendanceId).stream()
                 .filter(b ->
-                        b.getBreakType() == AgentBreak.BreakType.EXCEPTION
-                )
+                        b.getBreakType()
+                                == AgentBreak.BreakType.EXCEPTION)
+                .mapToLong(this::getEffectiveDuration)
+                .sum();
+    }
+
+    // USED TIME FOR ONE BREAK TYPE
+    @Transactional(readOnly = true)
+    public long getBreakTypeUsedSeconds(
+            Long agentId,
+            Long attendanceId,
+            AgentBreak.BreakType breakType) {
+
+        if (breakType == null
+                || breakType == AgentBreak.BreakType.NORMAL
+                || breakType == AgentBreak.BreakType.EXCEPTION) {
+            return 0;
+        }
+
+        return getBreaks(agentId, attendanceId).stream()
+                .filter(b -> b.getBreakType() == breakType)
                 .mapToLong(this::getEffectiveDuration)
                 .sum();
     }
@@ -221,8 +277,7 @@ public class AgentBreakService {
         return breakRepository
                 .findByAgentIdAndAttendanceIdOrderByStartTimeAsc(
                         agentId,
-                        attendanceId
-                );
+                        attendanceId);
     }
 
     private long getEffectiveDuration(AgentBreak agentBreak) {
@@ -235,29 +290,64 @@ public class AgentBreakService {
             return Math.max(
                     0,
                     Duration.between(
-                            agentBreak.getStartTime(),
-                            LocalDateTime.now(INDIA_ZONE)
-                    ).getSeconds()
-            );
+                                    agentBreak.getStartTime(),
+                                    LocalDateTime.now(INDIA_ZONE))
+                            .getSeconds());
         }
 
         return Math.max(
                 0,
                 Duration.between(
-                        agentBreak.getStartTime(),
-                        agentBreak.getEndTime()
-                ).getSeconds()
-        );
+                                agentBreak.getStartTime(),
+                                agentBreak.getEndTime())
+                        .getSeconds());
     }
 
-    // CHECK NORMAL BREAK LIMIT
+    private long getLimitSeconds(
+            AgentBreak.BreakType breakType) {
+
+        switch (breakType) {
+            case LUNCH:
+                return LUNCH_LIMIT_SECONDS;
+
+            case TEA:
+                return TEA_LIMIT_SECONDS;
+
+            case BIO:
+                return BIO_LIMIT_SECONDS;
+
+            default:
+                return 0;
+        }
+    }
+
+    private String getBreakLabel(
+            AgentBreak.BreakType breakType) {
+
+        switch (breakType) {
+            case LUNCH:
+                return "Lunch Break";
+
+            case TEA:
+                return "Tea Break";
+
+            case BIO:
+                return "Bio Break";
+
+            default:
+                return "Normal Break";
+        }
+    }
+
+    // CHECK OVERALL NORMAL BREAK LIMIT
     @Transactional(readOnly = true)
     public boolean isNormalBreakOverLimit(
             Long agentId,
             Long attendanceId) {
 
-        return getNormalBreakTotalSeconds(agentId, attendanceId)
-                > NORMAL_BREAK_LIMIT_SECONDS;
+        return getNormalBreakTotalSeconds(
+                agentId,
+                attendanceId) > TOTAL_NORMAL_LIMIT_SECONDS;
     }
 
     // BREAK SUMMARY
@@ -265,7 +355,8 @@ public class AgentBreakService {
     public BreakSummary getBreakSummary(Long agentId) {
 
         if (agentId == null) {
-            throw new IllegalArgumentException("Agent ID is required.");
+            throw new IllegalArgumentException(
+                    "Agent ID is required.");
         }
 
         LocalDate today = LocalDate.now(INDIA_ZONE);
@@ -274,39 +365,53 @@ public class AgentBreakService {
                 attendanceRepository
                         .findFirstByAgentIdAndAttendanceDateOrderByLoginTimeDesc(
                                 agentId,
-                                today
-                        )
+                                today)
                         .orElseThrow(() ->
                                 new IllegalStateException(
-                                        "No attendance record found for today."
-                                )
-                        );
+                                        "No attendance record found for today."));
+
+        Long attendanceId = attendance.getId();
+
+        long lunchUsed = getBreakTypeUsedSeconds(
+                agentId, attendanceId, AgentBreak.BreakType.LUNCH);
+
+        long teaUsed = getBreakTypeUsedSeconds(
+                agentId, attendanceId, AgentBreak.BreakType.TEA);
+
+        long bioUsed = getBreakTypeUsedSeconds(
+                agentId, attendanceId, AgentBreak.BreakType.BIO);
+
+        long legacyNormalUsed = getBreaks(
+                agentId, attendanceId).stream()
+                .filter(b ->
+                        b.getBreakType() == AgentBreak.BreakType.NORMAL)
+                .mapToLong(this::getEffectiveDuration)
+                .sum();
 
         long normalUsedSeconds =
-                getNormalBreakTotalSeconds(agentId, attendance.getId());
+                lunchUsed + teaUsed + bioUsed + legacyNormalUsed;
 
         long exceptionUsedSeconds =
-                getExceptionBreakTotalSeconds(agentId, attendance.getId());
+                getExceptionBreakTotalSeconds(agentId, attendanceId);
 
         AgentBreak activeBreak = getActiveBreak(agentId);
 
-        // Only show a break belonging to this attendance session.
         if (activeBreak != null
-                && !attendance.getId().equals(activeBreak.getAttendanceId())) {
+                && !attendanceId.equals(activeBreak.getAttendanceId())) {
             activeBreak = null;
         }
 
         long normalRemainingSeconds =
                 Math.max(
                         0,
-                        NORMAL_BREAK_LIMIT_SECONDS - normalUsedSeconds
-                );
+                        TOTAL_NORMAL_LIMIT_SECONDS - normalUsedSeconds);
 
         String activeBreakStartTime = null;
         String activeBreakType = null;
         long activeBreakElapsedSeconds = 0;
 
         if (activeBreak != null) {
+
             activeBreakStartTime =
                     activeBreak.getStartTime().toString();
 
@@ -314,13 +419,7 @@ public class AgentBreakService {
                     activeBreak.getBreakType().name();
 
             activeBreakElapsedSeconds =
-                    Math.max(
-                            0,
-                            Duration.between(
-                                    activeBreak.getStartTime(),
-                                    LocalDateTime.now(INDIA_ZONE)
-                            ).getSeconds()
-                    );
+                    getEffectiveDuration(activeBreak);
         }
 
         return new BreakSummary(
@@ -329,7 +428,13 @@ public class AgentBreakService {
                 exceptionUsedSeconds,
                 activeBreakStartTime,
                 activeBreakType,
-                activeBreakElapsedSeconds
+                activeBreakElapsedSeconds,
+                lunchUsed,
+                Math.max(0, LUNCH_LIMIT_SECONDS - lunchUsed),
+                teaUsed,
+                Math.max(0, TEA_LIMIT_SECONDS - teaUsed),
+                bioUsed,
+                Math.max(0, BIO_LIMIT_SECONDS - bioUsed)
         );
     }
 
@@ -343,13 +448,26 @@ public class AgentBreakService {
         private final String activeBreakType;
         private final long activeBreakElapsedSeconds;
 
+        private final long lunchUsedSeconds;
+        private final long lunchRemainingSeconds;
+        private final long teaUsedSeconds;
+        private final long teaRemainingSeconds;
+        private final long bioUsedSeconds;
+        private final long bioRemainingSeconds;
+
         public BreakSummary(
                 long normalUsedSeconds,
                 long normalRemainingSeconds,
                 long exceptionUsedSeconds,
                 String activeBreakStartTime,
                 String activeBreakType,
-                long activeBreakElapsedSeconds) {
+                long activeBreakElapsedSeconds,
+                long lunchUsedSeconds,
+                long lunchRemainingSeconds,
+                long teaUsedSeconds,
+                long teaRemainingSeconds,
+                long bioUsedSeconds,
+                long bioRemainingSeconds) {
 
             this.normalUsedSeconds = normalUsedSeconds;
             this.normalRemainingSeconds = normalRemainingSeconds;
@@ -357,6 +475,13 @@ public class AgentBreakService {
             this.activeBreakStartTime = activeBreakStartTime;
             this.activeBreakType = activeBreakType;
             this.activeBreakElapsedSeconds = activeBreakElapsedSeconds;
+
+            this.lunchUsedSeconds = lunchUsedSeconds;
+            this.lunchRemainingSeconds = lunchRemainingSeconds;
+            this.teaUsedSeconds = teaUsedSeconds;
+            this.teaRemainingSeconds = teaRemainingSeconds;
+            this.bioUsedSeconds = bioUsedSeconds;
+            this.bioRemainingSeconds = bioRemainingSeconds;
         }
 
         public long getNormalUsedSeconds() {
@@ -381,6 +506,30 @@ public class AgentBreakService {
 
         public long getActiveBreakElapsedSeconds() {
             return activeBreakElapsedSeconds;
+        }
+
+        public long getLunchUsedSeconds() {
+            return lunchUsedSeconds;
+        }
+
+        public long getLunchRemainingSeconds() {
+            return lunchRemainingSeconds;
+        }
+
+        public long getTeaUsedSeconds() {
+            return teaUsedSeconds;
+        }
+
+        public long getTeaRemainingSeconds() {
+            return teaRemainingSeconds;
+        }
+
+        public long getBioUsedSeconds() {
+            return bioUsedSeconds;
+        }
+
+        public long getBioRemainingSeconds() {
+            return bioRemainingSeconds;
         }
     }
 }

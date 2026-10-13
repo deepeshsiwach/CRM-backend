@@ -20,4 +20,6 @@ public interface LeadViewActivityRepository
             Long agentId,
             LocalDate viewedDate
     );
+
+    List<LeadViewActivity> findByViewedDate(LocalDate viewedDate);
 }

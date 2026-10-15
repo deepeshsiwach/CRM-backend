@@ -54,13 +54,7 @@ public class CallLog {
     @Column(name = "recording_path", length = 1000)
     private String recordingPath;
 
-    @Column(name = "qa_remark", columnDefinition = "TEXT")
-    private String qaRemark;
 
-
-
-    @Column(name = "qa_updated_at")
-    private LocalDateTime qaUpdatedAt;
 
     @Column(
             name = "created_at",
@@ -189,22 +183,6 @@ public class CallLog {
         this.recordingPath = recordingPath;
     }
 
-    public String getQaRemark() {
-        return qaRemark;
-    }
-
-    public void setQaRemark(String qaRemark) {
-        this.qaRemark = qaRemark;
-    }
-
-
-    public LocalDateTime getQaUpdatedAt() {
-        return qaUpdatedAt;
-    }
-
-    public void setQaUpdatedAt(LocalDateTime qaUpdatedAt) {
-        this.qaUpdatedAt = qaUpdatedAt;
-    }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

@@ -57,8 +57,7 @@ public class CallLog {
     @Column(name = "qa_remark", columnDefinition = "TEXT")
     private String qaRemark;
 
-    @Column(name = "qa_done_by", length = 150)
-    private String qaDoneBy;
+
 
     @Column(name = "qa_updated_at")
     private LocalDateTime qaUpdatedAt;
@@ -198,13 +197,6 @@ public class CallLog {
         this.qaRemark = qaRemark;
     }
 
-    public String getQaDoneBy() {
-        return qaDoneBy;
-    }
-
-    public void setQaDoneBy(String qaDoneBy) {
-        this.qaDoneBy = qaDoneBy;
-    }
 
     public LocalDateTime getQaUpdatedAt() {
         return qaUpdatedAt;

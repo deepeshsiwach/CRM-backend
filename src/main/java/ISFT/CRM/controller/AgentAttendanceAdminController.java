@@ -159,7 +159,40 @@ public class AgentAttendanceAdminController {
         long normalBreakSeconds = breaks.stream()
                 .filter(b -> b.getBreakType()
                         == AgentBreak.BreakType.NORMAL)
-                .mapToLong(b -> getEffectiveDuration(b, attendance))
+                .mapToLong(b -> {
+                    // Completed normal break: use its effective duration.
+                    if (b.getEndTime() != null) {
+                        return getEffectiveDuration(b, attendance);
+                    }
+
+                    // Active normal break: calculate elapsed time up to now.
+                    if (b.getStartTime() != null) {
+                        LocalDateTime now = LocalDateTime.now(INDIA_ZONE);
+                        LocalDateTime end = now;
+
+                        LocalDateTime dayEnd = attendance.getAttendanceDate()
+                                .plusDays(1)
+                                .atStartOfDay();
+
+                        if (end.isAfter(dayEnd)) {
+                            end = dayEnd;
+                        }
+
+                        LocalDateTime start = b.getStartTime();
+                        LocalDateTime dayStart = attendance.getAttendanceDate()
+                                .atStartOfDay();
+
+                        if (start.isBefore(dayStart)) {
+                            start = dayStart;
+                        }
+
+                        return end.isAfter(start)
+                                ? Duration.between(start, end).getSeconds()
+                                : 0L;
+                    }
+
+                    return 0L;
+                })
                 .sum();
 
         long exceptionBreakSeconds = breaks.stream()

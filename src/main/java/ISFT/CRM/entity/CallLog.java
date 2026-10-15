@@ -1,3 +1,4 @@
+
 package ISFT.CRM.entity;
 
 import jakarta.persistence.*;
@@ -11,97 +12,56 @@ public class CallLog {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-
-    // ========================================
-    // LEAD
-    // ========================================
-
     @Column(name = "lead_id", nullable = false)
     private Long leadId;
-
-
-    // ========================================
-    // AGENT
-    // ========================================
 
     @Column(name = "agent_id", nullable = false)
     private Long agentId;
 
-
-    // ========================================
-    // CALL START TIME
-    // ========================================
-
     @Column(name = "call_start_time", nullable = false)
     private LocalDateTime callStartTime;
-
-
-    // ========================================
-    // CALL END TIME
-    // ========================================
 
     @Column(name = "call_end_time")
     private LocalDateTime callEndTime;
 
-
-    // ========================================
-    // OLD DURATION FIELD
-    // Kept for existing database records
-    // ========================================
-
     @Column(name = "duration_seconds")
     private Integer durationSeconds;
-
-
-    // ========================================
-    // CALL STATUS
-    //
-    // Not required anymore for new call logs.
-    // Existing records can still contain a status.
-    // ========================================
 
     @Enumerated(EnumType.STRING)
     @Column(name = "call_status")
     private CallStatus callStatus;
 
-
-    // ========================================
-    // CALL OUTCOME
-    // ========================================
-
     @Enumerated(EnumType.STRING)
     @Column(name = "call_outcome")
     private CallOutcome callOutcome;
 
-
-    // ========================================
-    // REMARKS
-    // ========================================
-
     @Column(columnDefinition = "TEXT")
     private String remarks;
-
-
-    // ========================================
-    // OLD FIELDS
-    // Kept for existing records
-    // ========================================
 
     @Column(length = 150)
     private String education;
 
-
     @Column(name = "interested_area", length = 255)
     private String interestedArea;
-
 
     @Column(length = 150)
     private String city;
 
+    // ========================================
+    // CALL QUALITY ANALYSIS
+    // ========================================
 
-    // ========================================
-    // CREATED AT
-    // ========================================
+    @Column(name = "recording_path", length = 1000)
+    private String recordingPath;
+
+    @Column(name = "qa_remark", columnDefinition = "TEXT")
+    private String qaRemark;
+
+    @Column(name = "qa_done_by", length = 150)
+    private String qaDoneBy;
+
+    @Column(name = "qa_updated_at")
+    private LocalDateTime qaUpdatedAt;
 
     @Column(
             name = "created_at",
@@ -110,60 +70,27 @@ public class CallLog {
     )
     private LocalDateTime createdAt;
 
-
-    // ========================================
-    // CALL STATUS ENUM
-    // Kept for existing backend functionality
-    // ========================================
-
     public enum CallStatus {
-
         ANSWERED,
-
         NOT_ANSWERED,
-
         BUSY,
-
         FAILED
     }
 
-
-    // ========================================
-    // CALL OUTCOME ENUM
-    // ========================================
-
     public enum CallOutcome {
-
         INTERESTED,
-
         NOT_INTERESTED,
-
         CALL_BACK,
-
         FOLLOW_UP,
-
         COUNSELLING,
-
         ENROLLED,
-
         WRONG_NUMBER,
-
         NO_RESPONSE
     }
-
-
-    // ========================================
-    // GET ID
-    // ========================================
 
     public Long getId() {
         return id;
     }
-
-
-    // ========================================
-    // LEAD ID
-    // ========================================
 
     public Long getLeadId() {
         return leadId;
@@ -173,11 +100,6 @@ public class CallLog {
         this.leadId = leadId;
     }
 
-
-    // ========================================
-    // AGENT ID
-    // ========================================
-
     public Long getAgentId() {
         return agentId;
     }
@@ -185,11 +107,6 @@ public class CallLog {
     public void setAgentId(Long agentId) {
         this.agentId = agentId;
     }
-
-
-    // ========================================
-    // CALL START TIME
-    // ========================================
 
     public LocalDateTime getCallStartTime() {
         return callStartTime;
@@ -199,11 +116,6 @@ public class CallLog {
         this.callStartTime = callStartTime;
     }
 
-
-    // ========================================
-    // CALL END TIME
-    // ========================================
-
     public LocalDateTime getCallEndTime() {
         return callEndTime;
     }
@@ -211,12 +123,6 @@ public class CallLog {
     public void setCallEndTime(LocalDateTime callEndTime) {
         this.callEndTime = callEndTime;
     }
-
-
-    // ========================================
-    // DURATION
-    // Kept for existing backend compatibility
-    // ========================================
 
     public Integer getDurationSeconds() {
         return durationSeconds;
@@ -226,12 +132,6 @@ public class CallLog {
         this.durationSeconds = durationSeconds;
     }
 
-
-    // ========================================
-    // CALL STATUS
-    // Nullable now
-    // ========================================
-
     public CallStatus getCallStatus() {
         return callStatus;
     }
@@ -239,11 +139,6 @@ public class CallLog {
     public void setCallStatus(CallStatus callStatus) {
         this.callStatus = callStatus;
     }
-
-
-    // ========================================
-    // CALL OUTCOME
-    // ========================================
 
     public CallOutcome getCallOutcome() {
         return callOutcome;
@@ -253,11 +148,6 @@ public class CallLog {
         this.callOutcome = callOutcome;
     }
 
-
-    // ========================================
-    // REMARKS
-    // ========================================
-
     public String getRemarks() {
         return remarks;
     }
@@ -265,12 +155,6 @@ public class CallLog {
     public void setRemarks(String remarks) {
         this.remarks = remarks;
     }
-
-
-    // ========================================
-    // EDUCATION
-    // Kept for existing backend compatibility
-    // ========================================
 
     public String getEducation() {
         return education;
@@ -280,12 +164,6 @@ public class CallLog {
         this.education = education;
     }
 
-
-    // ========================================
-    // INTERESTED AREA
-    // Kept for existing backend compatibility
-    // ========================================
-
     public String getInterestedArea() {
         return interestedArea;
     }
@@ -293,12 +171,6 @@ public class CallLog {
     public void setInterestedArea(String interestedArea) {
         this.interestedArea = interestedArea;
     }
-
-
-    // ========================================
-    // CITY
-    // Kept for existing backend compatibility
-    // ========================================
 
     public String getCity() {
         return city;
@@ -308,10 +180,39 @@ public class CallLog {
         this.city = city;
     }
 
+    // QA getters and setters
 
-    // ========================================
-    // CREATED AT
-    // ========================================
+    public String getRecordingPath() {
+        return recordingPath;
+    }
+
+    public void setRecordingPath(String recordingPath) {
+        this.recordingPath = recordingPath;
+    }
+
+    public String getQaRemark() {
+        return qaRemark;
+    }
+
+    public void setQaRemark(String qaRemark) {
+        this.qaRemark = qaRemark;
+    }
+
+    public String getQaDoneBy() {
+        return qaDoneBy;
+    }
+
+    public void setQaDoneBy(String qaDoneBy) {
+        this.qaDoneBy = qaDoneBy;
+    }
+
+    public LocalDateTime getQaUpdatedAt() {
+        return qaUpdatedAt;
+    }
+
+    public void setQaUpdatedAt(LocalDateTime qaUpdatedAt) {
+        this.qaUpdatedAt = qaUpdatedAt;
+    }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

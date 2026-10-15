@@ -51,10 +51,6 @@ public class CallLog {
     // CALL QUALITY ANALYSIS
     // ========================================
 
-    @Column(name = "recording_path", length = 1000)
-    private String recordingPath;
-
-
 
     @Column(
             name = "created_at",
@@ -172,17 +168,6 @@ public class CallLog {
     public void setCity(String city) {
         this.city = city;
     }
-
-    // QA getters and setters
-
-    public String getRecordingPath() {
-        return recordingPath;
-    }
-
-    public void setRecordingPath(String recordingPath) {
-        this.recordingPath = recordingPath;
-    }
-
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

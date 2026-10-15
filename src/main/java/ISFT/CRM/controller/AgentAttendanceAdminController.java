@@ -105,8 +105,13 @@ public class AgentAttendanceAdminController {
                         );
 
         long normalBreakSeconds = breaks.stream()
-                .filter(b -> b.getBreakType()
-                        == AgentBreak.BreakType.NORMAL)
+                .filter(b -> {
+                    AgentBreak.BreakType type = b.getBreakType();
+                    return type == AgentBreak.BreakType.NORMAL
+                            || type == AgentBreak.BreakType.LUNCH
+                            || type == AgentBreak.BreakType.TEA
+                            || type == AgentBreak.BreakType.BIO;
+                })
                 .mapToLong(b -> getEffectiveDuration(b, attendance))
                 .sum();
 
@@ -157,8 +162,13 @@ public class AgentAttendanceAdminController {
                         );
 
         long normalBreakSeconds = breaks.stream()
-                .filter(b -> b.getBreakType()
-                        == AgentBreak.BreakType.NORMAL)
+                .filter(b -> {
+                    AgentBreak.BreakType type = b.getBreakType();
+                    return type == AgentBreak.BreakType.NORMAL
+                            || type == AgentBreak.BreakType.LUNCH
+                            || type == AgentBreak.BreakType.TEA
+                            || type == AgentBreak.BreakType.BIO;
+                })
                 .mapToLong(b -> {
                     // Completed normal break: use its effective duration.
                     if (b.getEndTime() != null) {
